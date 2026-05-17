@@ -51,12 +51,12 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           A reference companion for <a href="https://github.com/NousResearch/hermes-agent" class="ix-inline-link">Hermes Agent</a> by NousResearch.
         </p>
         <p class="ix-subtag">
-          Seven free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
+          Eight free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
         </p>
       </section>
 
       <section class="ix-strip-banner">
-        <span>▮ SEVEN FREE SURFACES — CHEATSHEET · MASTERCLASS · FOUNDATION · INTERNALS · HOW-TO · ROUTING · SKILLS ▮</span>
+        <span>▮ EIGHT FREE SURFACES — CHEATSHEET · MASTERCLASS · FOUNDATION · INTERNALS · HOW-TO · ROUTING · SKILLS · COOKBOOK ▮</span>
       </section>
 
       <section class="ix-grid" aria-label="Learning surfaces">
@@ -155,6 +155,20 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           </p>
           <div class="ix-card-meta">
             <span>9 sections</span><span>·</span><span>worked example</span><span>·</span><span>3-tier portability</span>
+          </div>
+        </a>
+
+        <a href={`${base}/cookbook/`} class="ix-card ix-card-teal-bright">
+          <div class="ix-card-h">
+            <span class="ix-card-n">08</span>
+            <span class="ix-card-title">Cookbook</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            Eight worked recipes, each anchored on a distinct primitive — code reviewer · multi-source research · curator daemon · PR triage tool · OpenAI-compatible proxy hop · MCP+SKILL combo · spec-driven feature builder · custom memory backend. <b>Copy-paste, then adapt.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>8 recipes</span><span>·</span><span>setup + run + observed</span><span>·</span><span>variations</span>
           </div>
         </a>
       </section>
@@ -339,6 +353,7 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
       .ix-card-goldenrod   { --ix-c: var(--color-goldenrod); }
       .ix-card-gold-bright { --ix-c: var(--color-gold); border-left-color: var(--color-amber); }
       .ix-card-amber-deep  { --ix-c: var(--color-amber); border-left-color: var(--color-teal); }
+      .ix-card-teal-bright { --ix-c: var(--color-teal); border-left-color: var(--color-gold); }
 
       .ix-card-h {
         display: flex;

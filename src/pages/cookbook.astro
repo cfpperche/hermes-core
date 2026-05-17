@@ -1,0 +1,828 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Cookbook · v${HERMES_VERSION}`;
+const pageDesc = `Eight worked recipes for Hermes Agent v0.14.0 — code reviewer, multi-source research, curator daemon, PR triage tool, OpenAI-compatible proxy hop, MCP + skill combo, spec-driven feature builder, custom memory backend. Each recipe names the primitive it leans on (ctx API call, plugin kind, hook event, gateway endpoint) so the pattern transfers.`;
+
+const recipes = [
+  { n: 1, slug: "code-review",     title: "Code reviewer agent",          tag: "command + sub-agent",  primitive: "register_command + dispatch_tool" },
+  { n: 2, slug: "research",        title: "Multi-source research synth",  tag: "skill + parallel",     primitive: "SKILL.md + parallel sub-agents"   },
+  { n: 3, slug: "curator",         title: "Curator daemon",               tag: "hook + bg",            primitive: "register_hook + inject_message"   },
+  { n: 4, slug: "pr-triage",       title: "PR triage tool",               tag: "register_tool",        primitive: "register_tool (LLM-callable)"     },
+  { n: 5, slug: "proxy-hop",       title: "OpenAI-compatible proxy hop",  tag: "gateway",              primitive: "Hermes gateway 127.0.0.1:8642"    },
+  { n: 6, slug: "mcp-skill",       title: "MCP server + SKILL.md combo",  tag: "mcp + skill",          primitive: "config.mcp + skill wrapper"       },
+  { n: 7, slug: "spec-builder",    title: "Spec-driven feature builder",  tag: "skill + orchestration",primitive: "SKILL.md orchestrating sub-agents"},
+  { n: 8, slug: "memory-backend",  title: "Custom memory backend",        tag: "exclusive plugin",     primitive: "register_memory_provider"         },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/cookbook/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="cookbook" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="ck-page">
+      <section class="ck-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · COOKBOOK</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>8 WORKED RECIPES ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">RECIPES</span>
+          <span class="hc-title-line hc-title-accent">THAT RUN</span>
+        </h1>
+        <p class="hc-tag">CODE-REVIEW · RESEARCH · CURATOR · PR-TRIAGE · PROXY · MCP · SPEC · MEMORY</p>
+        <p class="hc-subtag">
+          Eight recipes, each anchored on a <b>distinct Hermes primitive</b> — so reading the eight in sequence walks the runtime's surface area top-to-bottom (slash command, skill, hook, register_tool, gateway, MCP, sub-agent orchestration, exclusive plugin). Every recipe ships <b>setup + run + observed output + variations</b> so the next iteration is a config tweak, not a re-read.
+        </p>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          {recipes.map((r) => (
+            <li>
+              <a href={`#s${r.n}`}>
+                <span class="in-toc-n">{String(r.n).padStart(2, "0")}</span>
+                <span class="in-toc-title" set:html={r.title}></span>
+                <span class="in-toc-tag">{r.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §1 CODE REVIEWER ===== -->
+      <section id="s1" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">01</span>
+          <h2>Code reviewer agent</h2>
+          <span class="in-mod-tag">command + sub-agent</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A <code>/review</code> slash command. Reads <code>git diff origin/main..HEAD</code>, dispatches a sub-agent with a tight review brief, prints a structured report. Add <code>--post</code> to leave inline comments on the open PR via <code>gh pr review</code>.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> <code>ctx.register_command</code> + <code>ctx.dispatch_tool</code></p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>Files: <code>~/.hermes/plugins/code-review/plugin.yaml</code> + <code>__init__.py</code></p>
+
+        <pre class="ht-code"><code># plugin.yaml
+name: code-review
+version: "1.0.0"
+description: /review slash command — diff-grounded code review, optional PR post.
+kind: standalone
+requires_env:
+  - name: GITHUB_TOKEN
+    description: "Required for --post mode"
+    secret: true</code></pre>
+
+        <pre class="ht-code"><code># __init__.py
+import subprocess
+from textwrap import dedent
+
+BRIEF = dedent("""\
+    Review the diff below. Output sections:
+      ## Bugs           — concrete defects, file:line
+      ## Smells         — non-blocking concerns
+      ## Suggestions    — small improvements with diff snippets
+      ## Verdict        — ship / ship-with-fixups / hold
+
+    Be terse. No preamble. Cite file:line for every finding.
+    """)
+
+def _diff() -> str:
+    return subprocess.check_output(
+        ["git", "diff", "origin/main..HEAD", "--unified=10"],
+        text=True,
+    )
+
+def _review_cmd(args: str, ctx) -> str:
+    diff = _diff()
+    if not diff.strip():
+        return "No diff vs origin/main."
+    report = ctx.dispatch_tool("llm.complete", &#123;
+        "system": BRIEF,
+        "prompt": "```diff\n" + diff + "\n```",
+        "model": "claude-sonnet-4-6",
+    &#125;)
+    if "--post" in args:
+        subprocess.run(
+            ["gh", "pr", "review", "--comment", "-b", report],
+            check=True,
+        )
+        return "Review posted."
+    return report
+
+def register(ctx):
+    ctx.register_command(
+        name="review",
+        handler=_review_cmd,
+        description="Review the current branch diff vs origin/main.",
+        args_hint="[--post]",
+    )</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>hermes plugins install ~/.hermes/plugins/code-review
+hermes
+&gt; /review
+&gt; /review --post     # leave the report as a PR comment</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Returns a 4-section report rendered in-session as a regular assistant turn.</li>
+          <li><code>--post</code> exits via <code>gh pr review --comment</code>; the PR thread shows the review as a single comment from your authenticated user.</li>
+          <li>Diff is bounded to <code>origin/main..HEAD</code> — large feature branches stay in scope.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Per-file scoping:</b> accept <code>/review path/to/file.py</code> and pass <code>--</code> to <code>git diff</code>.</li>
+          <li><b>Severity filter:</b> add <code>--bugs-only</code> to instruct the brief to drop Smells + Suggestions.</li>
+          <li><b>Inline comments:</b> swap the single PR comment for <code>gh api</code> calls per-finding using <code>file</code>+<code>line</code> (richer UX, more rate-limit risk).</li>
+        </ul>
+      </section>
+
+      <!-- ===== §2 RESEARCH ===== -->
+      <section id="s2" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">02</span>
+          <h2>Multi-source research synthesis</h2>
+          <span class="in-mod-tag">skill + parallel</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A <code>/research &lt;topic&gt;</code> skill (no Python needed) that the agent reads on activation. Procedure section instructs the model to fan out 3-5 parallel <code>web_search</code> + <code>web_fetch</code> calls, then synthesize one markdown report with cited sources.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> <code>SKILL.md</code> + parallel tool calls (no plugin code)</p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>File: <code>~/.hermes/skills/research/SKILL.md</code></p>
+
+        <pre class="ht-code"><code>---
+name: research
+description: |
+  Multi-source research synthesis. Fan out parallel web_search + web_fetch
+  calls, then write a single markdown report with cited sources.
+  Use when the user asks "research X", "what's the state of Y",
+  "compare A vs B", or any question that needs multi-source grounding.
+license: MIT
+compatibility: Compatible with any agentskills.io runtime that exposes web_search + web_fetch.
+metadata:
+  author: yourorg
+  version: "1.0"
+  agent0-portability-tier: agentskills-portable
+---
+
+## When to use
+The user wants a research synthesis on a topic — multi-source, cited, current.
+Heuristics: "research", "deep dive", "what's the state of", "compare", "vs",
+question with no clear single-source answer.
+
+## Procedure
+1. Decompose the topic into 3-5 sub-queries that span different angles
+   (official docs / community discourse / benchmarks / counter-arguments).
+2. Issue ALL sub-queries in PARALLEL via web_search (single message,
+   multiple tool calls).
+3. For each top-3 result per sub-query, web_fetch the URL in parallel
+   (same message, multiple tool calls).
+4. Synthesize a single markdown report:
+   - One H2 per sub-query.
+   - Cite every claim — `[source](URL)` inline.
+   - End with "## Synthesis" — 5-bullet takeaway.
+   - End with "## Open questions" — what the sources disagreed on.
+
+## Pitfalls
+- Don't fan out sequentially — that's the bug this skill exists to fix.
+- Don't cite an URL you didn't fetch — search snippets aren't enough.
+- Cap fetched pages at 12 per run — token budget.</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>hermes
+&gt; /research the state of agentic memory layers in 2026</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Hermes activates the skill on the keyword. The model fans out 3-5 <code>web_search</code> calls in <b>one tool-use block</b>.</li>
+          <li>Follow-up turn fans out up to 12 <code>web_fetch</code> calls in one block.</li>
+          <li>Final assistant turn is the markdown report — one H2 per sub-query, inline citations, synthesis + open-questions footer.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Domain whitelist:</b> add a <code>## Allowed domains</code> section listing primary sources only.</li>
+          <li><b>Save to file:</b> ask the model in step 4 to also <code>Write</code> to <code>~/research/&lt;slug&gt;.md</code>.</li>
+          <li><b>Plugin upgrade:</b> wrap as a <code>/research</code> command if you want CLI invocation outside an interactive session.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §3 CURATOR DAEMON ===== -->
+      <section id="s3" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">03</span>
+          <h2>Curator daemon</h2>
+          <span class="in-mod-tag">hook + bg</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A plugin that registers on <code>on_session_start</code>, scans the project for signals (stale TODOs, failing CI, big PRs idle 14+ days), and pushes the top 3 findings as a synthetic message via <code>ctx.inject_message</code>. The session begins already aware of what needs attention.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> <code>ctx.register_hook('on_session_start', ...)</code> + <code>ctx.inject_message</code></p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>Files: <code>~/.hermes/plugins/curator/plugin.yaml</code> + <code>__init__.py</code></p>
+
+        <pre class="ht-code"><code># plugin.yaml
+name: curator
+version: "1.0.0"
+description: Surfaces project signals at session start.
+kind: standalone</code></pre>
+
+        <pre class="ht-code"><code># __init__.py
+import subprocess, json, datetime as dt
+from pathlib import Path
+
+def _idle_prs(cwd):
+    try:
+        raw = subprocess.check_output(
+            ["gh", "pr", "list", "--state=open",
+             "--json", "number,title,updatedAt", "--limit=20"],
+            text=True, cwd=cwd,
+        )
+    except Exception:
+        return []
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff = now - dt.timedelta(days=14)
+    idle = []
+    for pr in json.loads(raw):
+        updated = dt.datetime.fromisoformat(pr["updatedAt"].replace("Z", "+00:00"))
+        if cutoff > updated:
+            num, title = pr["number"], pr["title"]
+            idle.append("#%s %s" % (num, title))
+    return idle[:3]
+
+def _ci_failing(cwd):
+    try:
+        raw = subprocess.check_output(
+            ["gh", "run", "list", "--limit=1",
+             "--json", "conclusion,name"],
+            text=True, cwd=cwd,
+        )
+        runs = json.loads(raw)
+        if runs and runs[0].get("conclusion") == "failure":
+            name = runs[0]["name"]
+            return "last CI run failed: %s" % name
+    except Exception:
+        pass
+    return None
+
+def _on_session_start(ctx, **kwargs):
+    cwd = Path.cwd()
+    findings = []
+    ci = _ci_failing(cwd)
+    if ci:
+        findings.append("- WARN " + ci)
+    for pr in _idle_prs(cwd):
+        findings.append("- IDLE PR: " + pr)
+    if findings:
+        ctx.inject_message(
+            "=== curator: signals at session start ===\n"
+            + "\n".join(findings[:3])
+        )
+
+def register(ctx):
+    ctx.register_hook("on_session_start", _on_session_start)</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>cd ~/your-project
+hermes
+# The session opens with the curator's findings already injected.</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>First assistant turn ALREADY references the findings — "I see the last CI run failed and PR #142 has been idle for 18 days. Want to start with one of those?".</li>
+          <li>Findings cap at 3 — keeps the session-start budget tight.</li>
+          <li>If <code>gh</code> is unauth or absent, the relevant section silently drops (no nag).</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Per-repo config:</b> read thresholds from <code>~/.hermes/curator.json</code> — different signals per project.</li>
+          <li><b>Severity weighting:</b> emit a small score per finding; <code>inject_message</code> only when score &gt; threshold.</li>
+          <li><b>Different hook event:</b> swap <code>on_session_start</code> for <code>on_session_end</code> if you want a session-debrief instead of session-prelude.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §4 PR TRIAGE TOOL ===== -->
+      <section id="s4" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">04</span>
+          <h2>PR triage tool</h2>
+          <span class="in-mod-tag">register_tool</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A <b>tool</b> the model can call directly (vs a slash command the human invokes). Exposes <code>triage_prs(repo: str, limit: int)</code> — the LLM decides when to use it. Returns suggested labels + reviewers per PR.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> <code>ctx.register_tool</code> — LLM-callable, schema-typed</p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>Files: <code>~/.hermes/plugins/pr-triage/plugin.yaml</code> + <code>__init__.py</code></p>
+
+        <pre class="ht-code"><code># __init__.py
+import json, subprocess
+
+SCHEMA = &#123;
+    "type": "object",
+    "properties": &#123;
+        "repo":  &#123;"type": "string", "description": "owner/repo"&#125;,
+        "limit": &#123;"type": "integer", "default": 10, "minimum": 1, "maximum": 50&#125;,
+    &#125;,
+    "required": ["repo"],
+&#125;
+
+def _triage_handler(args: dict, ctx) -> str:
+    out = subprocess.check_output(
+        ["gh", "pr", "list", "-R", args["repo"],
+         "--state=open", "--json", "number,title,body,labels,files",
+         "--limit=" + str(args.get("limit", 10))],
+        text=True,
+    )
+    prs = json.loads(out)
+    result = []
+    for pr in prs:
+        files = [f["path"] for f in pr.get("files", [])]
+        # Heuristic classification — replace with LLM call for nuance.
+        kind = "feature"
+        if any("test" in f for f in files): kind = "test"
+        if any("doc" in f.lower() or f.endswith(".md") for f in files): kind = "docs"
+        if any("package.json" in f or "lock" in f for f in files): kind = "dep"
+        if any(w in pr["title"].lower() for w in ("fix", "bug", "regression")):
+            kind = "bug"
+        suggested_label = kind
+        suggested_reviewer = &#123;
+            "bug": "@oncall",
+            "feature": "@product-eng",
+            "docs": "@docs-team",
+            "dep": "@security",
+            "test": "@qa",
+        &#125;.get(kind, "@team")
+        result.append(&#123;
+            "number": pr["number"],
+            "title": pr["title"],
+            "kind": kind,
+            "label": suggested_label,
+            "reviewer": suggested_reviewer,
+        &#125;)
+    return json.dumps(result, indent=2)
+
+def register(ctx):
+    ctx.register_tool(
+        name="triage_prs",
+        toolset="github",
+        schema=SCHEMA,
+        handler=_triage_handler,
+        description=(
+            "Classify open PRs in a repo and suggest labels + reviewers. "
+            "Use when the user asks 'triage the open PRs' or 'what's open and "
+            "what should I look at first?'."
+        ),
+    )</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>hermes
+&gt; triage the open PRs on cfpperche/hermes-core
+# The model decides to call triage_prs(repo="cfpperche/hermes-core", limit=10)
+# Hermes routes the call to your handler. Result is fed back as tool output.</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Tool registered under toolset <code>github</code> — toggle with <code>hermes toolsets enable github</code>.</li>
+          <li>Schema is enforced — invalid args (missing <code>repo</code>) return a structured error to the model, which self-corrects.</li>
+          <li>Handler returns a JSON string; the model reads it and writes the natural-language summary.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>LLM classification:</b> replace the heuristic ladder with <code>ctx.dispatch_tool("llm.complete", ...)</code> for nuanced labels.</li>
+          <li><b>Auto-apply labels:</b> add <code>--apply</code> path that runs <code>gh pr edit --add-label</code>.</li>
+          <li><b>Slack the summary:</b> add a second tool <code>post_triage_to_slack</code> and let the model chain them.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §5 PROXY HOP ===== -->
+      <section id="s5" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>OpenAI-compatible proxy hop</h2>
+          <span class="in-mod-tag">gateway</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Point any OpenAI-SDK app (n8n, Bruno, curl, LangChain, your own code) at <code>http://127.0.0.1:8642/v1</code>. Hermes routes the request through its configured providers, fallback chain, and cost telemetry — your downstream app gets a single OpenAI-compatible endpoint with multi-provider economics behind it.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> Hermes embedded gateway (<code>hermes serve</code>) on <code>127.0.0.1:8642</code></p>
+
+        <h3 class="in-h3">Setup</h3>
+        <pre class="ht-code"><code># 1. Start the gateway in the background
+hermes serve --host 127.0.0.1 --port 8642 &
+
+# 2. Point any client at it — OpenAI SDK shape
+curl http://127.0.0.1:8642/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '&#123;
+    "model": "claude-sonnet-4-6",
+    "messages": [&#123;"role":"user","content":"hello"&#125;]
+  &#125;'</code></pre>
+
+        <p>Configure routing + fallback in <code>~/.hermes/config.json</code>:</p>
+        <pre class="ht-code"><code>// ~/.hermes/config.json
+&#123;
+  "providers": [
+    &#123;"id": "anthropic-primary",  "kind": "anthropic", "models": ["claude-*"]&#125;,
+    &#123;"id": "openrouter-fallback","kind": "openrouter","models": ["*"]&#125;
+  ],
+  "routing": &#123;
+    "claude-*": ["anthropic-primary", "openrouter-fallback"],
+    "gpt-*":    ["openrouter-fallback"]
+  &#125;,
+  "fallback": &#123;
+    "on_status": [429, 500, 502, 503, 504],
+    "on_timeout_ms": 30000
+  &#125;
+&#125;</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code># From a Python OpenAI SDK client:
+import openai
+client = openai.OpenAI(
+    base_url="http://127.0.0.1:8642/v1",
+    api_key="sk-not-used-locally",
+)
+print(client.chat.completions.create(
+    model="claude-sonnet-4-6",
+    messages=[&#123;"role":"user","content":"summarize hermes-core in one tweet"&#125;],
+).choices[0].message.content)</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Client sees a normal OpenAI <code>/v1/chat/completions</code> response.</li>
+          <li>Hermes records the call in <code>~/.hermes/state.db</code> — provider used, latency, tokens, cost. Query via the SQL snippets on the <a href={`${base}/routing/`}>Routing</a> page.</li>
+          <li>If the primary provider 429s, Hermes auto-fails-over to the second in the routing list — the client never sees the error.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Multi-tenant:</b> bind to a Tailscale interface instead of <code>127.0.0.1</code>; route <code>X-Hermes-Tenant</code> header to different config sections.</li>
+          <li><b>Cache layer:</b> enable cross-session cache in config — see the Routing page for the schema.</li>
+          <li><b>Reverse-proxy w/ TLS:</b> front with Caddy on <code>:443</code> — see <a href={`${base}/how-to/`}>How-To § VPS</a> for the topology.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §6 MCP + SKILL ===== -->
+      <section id="s6" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">06</span>
+          <h2>MCP server + SKILL.md combo</h2>
+          <span class="in-mod-tag">mcp + skill</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Register the Playwright MCP server in <code>~/.hermes/config.json</code> (gives the model 20+ browser tools), then write a <code>web-audit</code> SKILL.md that wraps those tools into a single procedural recipe with prompts. The combo: low-level capability via MCP, high-level recipe via SKILL.md.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> MCP server config + SKILL.md procedural wrapper</p>
+
+        <h3 class="in-h3">Setup — MCP server</h3>
+        <pre class="ht-code"><code># ~/.hermes/config.json
+&#123;
+  "mcp_servers": &#123;
+    "playwright": &#123;
+      "command": "bunx",
+      "args": ["@playwright/mcp@latest", "--browser=chrome"],
+      "env": &#123;&#125;
+    &#125;
+  &#125;
+&#125;</code></pre>
+
+        <p>Restart Hermes; the Playwright tools surface under <code>mcp__playwright__*</code>.</p>
+
+        <h3 class="in-h3">Setup — SKILL.md wrapper</h3>
+        <p>File: <code>~/.hermes/skills/web-audit/SKILL.md</code></p>
+
+        <pre class="ht-code"><code>---
+name: web-audit
+description: |
+  Full visual + content audit of a deployed URL using Playwright MCP.
+  Use when the user says "audit URL X", "check the live site",
+  "screenshot and report on Y", or "is the deploy broken".
+license: MIT
+compatibility: Requires Playwright MCP server registered in config.
+metadata:
+  author: yourorg
+  version: "1.0"
+  agent0-portability-tier: agentskills-portable
+---
+
+## When to use
+The user wants an automated visual + content check of a deployed URL.
+
+## Procedure
+1. Resolve the target URL (ask once if not provided).
+2. Open via mcp__playwright__browser_navigate.
+3. Take an initial screenshot via mcp__playwright__browser_take_screenshot.
+4. Snapshot accessibility tree via mcp__playwright__browser_snapshot.
+5. Walk the visible hero + first 3 below-fold sections; screenshot each.
+6. Check console for errors via mcp__playwright__browser_console_messages.
+7. Write a report:
+   - ## Findings — visual bugs (overflow, color, missing assets) cited per screenshot.
+   - ## Console — any warnings/errors.
+   - ## Verdict — ship / fix-then-ship / regression.
+
+## Pitfalls
+- Playwright MCP needs a real browser binary — bunx installs Chromium on first run.
+- Don't fan out screenshots > 6 per audit — token budget.</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>hermes
+&gt; /web-audit https://cfpperche.github.io/hermes-core/cookbook/</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Hermes spawns the Playwright MCP server as a subprocess (one per session, killed at session end).</li>
+          <li>The skill walks the procedure — 4-6 tool calls, ending with a structured report.</li>
+          <li>Screenshots are returned as inline image tool-results; the report references them by index.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Performance audit:</b> swap Playwright MCP for Chrome DevTools MCP and snapshot perf traces.</li>
+          <li><b>Auth'd audit:</b> store browser state in <code>.hermes/.browser-state/&lt;host&gt;.json</code> and reuse — same pattern as Agent0's <code>BROWSER_AUTH_REQUIRED</code>.</li>
+          <li><b>Diff audit:</b> add <code>--baseline URL2</code> and have the skill compare two deploys.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §7 SPEC BUILDER ===== -->
+      <section id="s7" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">07</span>
+          <h2>Spec-driven feature builder</h2>
+          <span class="in-mod-tag">skill + orchestration</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A <code>/build-spec &lt;path&gt;</code> skill that reads <code>docs/specs/NNN-slug/spec.md</code>, decomposes it into <code>tasks.md</code>, then implements one task at a time, committing between. Pure SKILL.md — no plugin code. The orchestration lives in the procedure.</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> SKILL.md orchestrating Read / Write / Bash / sub-agent dispatch</p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>File: <code>~/.hermes/skills/build-spec/SKILL.md</code></p>
+
+        <pre class="ht-code"><code>---
+name: build-spec
+description: |
+  Read a spec.md, decompose to tasks.md, implement one task at a time,
+  commit between tasks. Use when the user says "build spec NNN",
+  "implement docs/specs/X", or points at a spec dir.
+license: MIT
+compatibility: Compatible with any agentskills.io runtime with shell + file IO.
+metadata:
+  author: yourorg
+  version: "1.0"
+  agent0-portability-tier: agentskills-portable
+---
+
+## When to use
+The user points at a spec directory and asks to implement it.
+
+## Procedure
+1. Read `<spec-dir>/spec.md` in full. Confirm scope in one sentence.
+2. If `<spec-dir>/tasks.md` is missing or empty, generate it:
+   - 4-10 tasks, each "small enough that done is unambiguous".
+   - First task = scaffold + dependency setup.
+   - Last task = verification / docs / cleanup.
+3. For each pending task in tasks.md:
+   a. Mark in-progress (edit the checkbox).
+   b. Implement (Edit / Write / Bash). Re-read affected files first.
+   c. Run `<verifier-cmd>` from spec.md § Acceptance.
+   d. If green: commit with body referencing spec slug; mark task done.
+   e. If red: fix; re-verify. Loop budget 3 fixes; then escalate.
+4. After last task: read spec.md § Acceptance criteria aloud, verify each.
+
+## Pitfalls
+- Do NOT batch multiple tasks per commit — defeats the "small step" property.
+- Do NOT skip the verifier — the commit-between-tasks ritual exists to fail fast.
+- If spec.md § Acceptance is missing, STOP and ask the user to add it.</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>hermes
+&gt; /build-spec docs/specs/042-add-rate-limiter/</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>Hermes reads spec.md, drafts tasks.md if absent, asks once for confirmation, then iterates.</li>
+          <li>One commit per task; <code>git log --oneline</code> shows the spec slug per commit.</li>
+          <li>Verifier exit-codes drive the loop — green moves on, red triggers a fix turn.</li>
+          <li>Halts cleanly at the spec's acceptance checklist; final assistant turn reads each criterion and reports pass/fail.</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Sub-agent per task:</b> add <code>dispatch_tool("agent.run", ...)</code> for each task with a tight 5-field brief — parallelizes independent tasks.</li>
+          <li><b>Dry-run mode:</b> <code>/build-spec ... --plan</code> generates tasks.md but stops before implementing.</li>
+          <li><b>SDD integration:</b> if the project uses Agent0's <code>/sdd</code> skill, delegate steps 1+2 to it via <code>/sdd plan</code> + <code>/sdd tasks</code>.</li>
+        </ul>
+      </section>
+
+      <!-- ===== §8 MEMORY BACKEND ===== -->
+      <section id="s8" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">08</span>
+          <h2>Custom memory backend</h2>
+          <span class="in-mod-tag">exclusive plugin</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Swap Hermes's default SQLite state.db for an external memory layer (Postgres, Honcho, Mnemosyne). Implement a <code>MemoryProvider</code> subclass, call <code>ctx.register_memory_provider()</code> — Hermes auto-classifies the plugin as <code>kind: exclusive</code> (single slot, only one active at a time).</p>
+
+        <p class="ck-primitive"><b>Primitive:</b> <code>ctx.register_memory_provider</code> (exclusive kind, auto-detected)</p>
+
+        <h3 class="in-h3">Setup</h3>
+        <p>Files: <code>~/.hermes/plugins/honcho-memory/plugin.yaml</code> + <code>__init__.py</code></p>
+
+        <pre class="ht-code"><code># plugin.yaml
+name: honcho-memory
+version: "1.0.0"
+description: Honcho-backed memory provider (replaces default SQLite state.db).
+# kind: exclusive  — auto-detected from MemoryProvider import below
+requires_env:
+  - name: HONCHO_URL
+    description: "Honcho server endpoint"
+  - name: HONCHO_API_KEY
+    secret: true</code></pre>
+
+        <pre class="ht-code"><code># __init__.py
+import os
+import requests
+from hermes_agent.memory import MemoryProvider, Message, SessionState
+
+class HonchoMemory(MemoryProvider):
+    def __init__(self):
+        self.base = os.environ["HONCHO_URL"]
+        self.key  = os.environ["HONCHO_API_KEY"]
+        self.h    = &#123;"Authorization": "Bearer " + self.key&#125;
+
+    def load_session(self, session_id):
+        url = self.base + "/sessions/" + session_id
+        r = requests.get(url, headers=self.h)
+        if r.status_code == 404: return None
+        return SessionState.from_json(r.json())
+
+    def save_session(self, state):
+        url = self.base + "/sessions/" + state.id
+        requests.put(url, headers=self.h, json=state.to_json())
+
+    def append_message(self, session_id, msg):
+        url = self.base + "/sessions/" + session_id + "/messages"
+        requests.post(url, headers=self.h, json=msg.to_json())
+
+    def search(self, query, top_k=5):
+        url = self.base + "/search"
+        r = requests.post(url, headers=self.h, json=&#123;"q": query, "k": top_k&#125;)
+        return [Message.from_json(m) for m in r.json()["hits"]]
+
+def register(ctx):
+    ctx.register_memory_provider(HonchoMemory())</code></pre>
+
+        <p>Activate the plugin (exclusive plugins are config-gated — only one active at a time):</p>
+        <pre class="ht-code"><code>hermes config set memory.provider honcho-memory
+hermes plugins list --kind exclusive   # verify only one active</code></pre>
+
+        <h3 class="in-h3">Run</h3>
+        <pre class="ht-code"><code>export HONCHO_URL=https://honcho.example.com
+export HONCHO_API_KEY=hk_xxx
+hermes
+# Hermes now reads + writes session state from Honcho instead of SQLite.</code></pre>
+
+        <h3 class="in-h3">Observed</h3>
+        <ul class="ht-list">
+          <li>The local <code>~/.hermes/state.db</code> file is no longer written to.</li>
+          <li>Session resume from a different machine works — state lives upstream.</li>
+          <li>If two memory plugins are activated, Hermes refuses to start ("multiple exclusive providers in slot <code>memory</code>").</li>
+        </ul>
+
+        <h3 class="in-h3">Variations</h3>
+        <ul class="ht-list">
+          <li><b>Postgres backend:</b> same shape, swap HTTP for psycopg.</li>
+          <li><b>Hybrid:</b> keep SQLite for hot path, async-replicate to Honcho for cross-device. More complex; only worth it past 3+ machines.</li>
+          <li><b>Read-only audit:</b> implement only <code>load_session</code> + <code>search</code>; raise on writes. Useful for replay-only analytics envs.</li>
+        </ul>
+      </section>
+
+      <!-- ===== CLOSER ===== -->
+      <section class="ck-closer">
+        <p>
+          Each recipe is a <b>composable primitive</b>. Mix them — a curator daemon that calls the proxy hop's gateway; a code-review tool that uses the MCP+SKILL combo for screenshot diffs; a spec builder that registers a custom memory backend for the implementation log. The shape stays the same: declare the primitive, hand the LLM a tight procedure, let the runtime route.
+        </p>
+        <p>
+          Found a bug or want a 9th recipe? <a href="https://github.com/cfpperche/hermes-core/issues">File an issue</a>. PRs welcome — keep the Intent / Setup / Run / Observed / Variations shape.
+        </p>
+      </section>
+    </main>
+
+    <footer class="hc-foot">
+      <span>hermes-core · cookbook · v{HERMES_VERSION} ({HERMES_TAG})</span>
+      <span><a href="https://github.com/cfpperche/hermes-core">source</a></span>
+    </footer>
+
+    <style>
+      .ck-page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 1.5rem 1.2rem 4rem;
+        color: var(--color-fg);
+      }
+      .ck-banner {
+        margin-bottom: 2rem;
+      }
+      .ck-mod {
+        margin: 2.5rem 0;
+        padding: 1.2rem 1rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--color-gold);
+      }
+      .ck-mod p,
+      .ck-mod li {
+        font-size: 0.92rem;
+        line-height: 1.65;
+      }
+      .ck-primitive {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        background: var(--color-bg);
+        border-left: 2px solid var(--color-amber);
+        padding: 0.5rem 0.7rem;
+        margin: 0.4rem 0 1.2rem;
+      }
+      .ck-primitive b {
+        color: var(--color-amber);
+      }
+      .ck-closer {
+        margin: 3rem 0 1rem;
+        padding: 1.4rem 1.2rem;
+        background: var(--color-surface-mid);
+        border-left: 3px solid var(--color-teal);
+      }
+      .ck-closer p {
+        font-size: 0.95rem;
+        line-height: 1.7;
+        margin-bottom: 0.8rem;
+      }
+      .ck-closer p:last-child { margin-bottom: 0; }
+      .ck-closer a {
+        color: var(--color-amber);
+      }
+      .ck-closer a:hover { color: var(--color-gold); }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #f7f7f5;
+          --color-surface-mid: #efefea;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .ck-mod { break-inside: avoid; }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
+  </body>
+</html>

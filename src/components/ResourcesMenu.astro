@@ -5,7 +5,7 @@
 // Add a new surface? Add a row to RESOURCES below and a slug to CurrentPage.
 // Every page that imports this component picks it up automatically.
 
-export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to" | "routing" | "skills";
+export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to" | "routing" | "skills" | "cookbook";
 
 interface Props {
   current: CurrentPage;
@@ -69,6 +69,13 @@ const RESOURCES: {
     title: "Skill Authoring",
     desc: "SKILL.md schema · ctx API · 5 kinds · curator · agentskills.io portability",
     href: `${base}/skills/`,
+  },
+  {
+    slug: "cookbook",
+    num: "08",
+    title: "Cookbook",
+    desc: "8 worked recipes — code review, research, curator, triage, proxy, MCP, spec, memory",
+    href: `${base}/cookbook/`,
   },
 ];
 ---
