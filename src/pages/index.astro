@@ -51,12 +51,12 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           A reference companion for <a href="https://github.com/NousResearch/hermes-agent" class="ix-inline-link">Hermes Agent</a> by NousResearch.
         </p>
         <p class="ix-subtag">
-          Four free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
+          Five free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
         </p>
       </section>
 
       <section class="ix-strip-banner">
-        <span>▮ FOUR FREE SURFACES — CHEATSHEET · MASTER CLASS · FOUNDATION · INTERNALS ▮</span>
+        <span>▮ FIVE FREE SURFACES — CHEATSHEET · MASTER CLASS · FOUNDATION · INTERNALS · HOW-TO ▮</span>
       </section>
 
       <section class="ix-grid" aria-label="Learning surfaces">
@@ -113,6 +113,20 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           </p>
           <div class="ix-card-meta">
             <span>6 sections</span><span>·</span><span>6 SVG infographics</span><span>·</span><span>source-grounded</span>
+          </div>
+        </a>
+
+        <a href={`${base}/how-to/`} class="ix-card ix-card-goldenrod">
+          <div class="ix-card-h">
+            <span class="ix-card-n">05</span>
+            <span class="ix-card-title">How-To</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            Ops guide — local install (Linux/macOS/WSL/Windows/Termux), VPS deploy (systemd, Caddy, nginx), security hardening (12 controls + hook-allowlist gotcha), prompt-cache + compression tuning, day-2 ops. <b>From <code>pip install</code> to a hardened VPS.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>5 sections</span><span>·</span><span>VPS topology SVG</span><span>·</span><span>copy-paste blocks</span>
           </div>
         </a>
       </section>
@@ -290,10 +304,11 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
         background: var(--color-surface-mid);
       }
 
-      .ix-card-gold   { --ix-c: var(--color-gold); }
-      .ix-card-amber  { --ix-c: var(--color-amber); }
-      .ix-card-bronze { --ix-c: var(--color-bronze); }
-      .ix-card-teal   { --ix-c: var(--color-teal); }
+      .ix-card-gold      { --ix-c: var(--color-gold); }
+      .ix-card-amber     { --ix-c: var(--color-amber); }
+      .ix-card-bronze    { --ix-c: var(--color-bronze); }
+      .ix-card-teal      { --ix-c: var(--color-teal); }
+      .ix-card-goldenrod { --ix-c: var(--color-goldenrod); }
 
       .ix-card-h {
         display: flex;

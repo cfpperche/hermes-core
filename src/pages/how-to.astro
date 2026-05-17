@@ -1,0 +1,792 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · How-To · v${HERMES_VERSION}`;
+const pageDesc = `Operations guide for Hermes Agent — local install (Linux / macOS / WSL / Windows / Termux), VPS deployment (systemd, webhooks, reverse proxy), security hardening, performance optimization, and day-2 ops.`;
+
+const sections = [
+  { n: 1, slug: "local",   title: "Local install · first chat",        tag: "setup"        },
+  { n: 2, slug: "vps",     title: "VPS / dedicated deployment",         tag: "production"   },
+  { n: 3, slug: "harden",  title: "Security hardening",                 tag: "security"     },
+  { n: 4, slug: "perf",    title: "Performance &amp; cost optimization",    tag: "optimization" },
+  { n: 5, slug: "ops",     title: "Day-2 ops &amp; troubleshooting",        tag: "monitoring"   },
+];
+
+const installMatrix = [
+  { os: "Linux",            cmd: "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash", note: "Installs to ~/.hermes/, binary at ~/.local/bin/hermes" },
+  { os: "macOS",            cmd: "(same curl command — no Homebrew formula yet)", note: "Native + Apple Silicon supported" },
+  { os: "WSL2",             cmd: "(same curl command)",                                                                                  note: "Full feature parity; recommended Windows path" },
+  { os: "Windows native",   cmd: "irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex",        note: "Beta. Bundles PortableGit. No admin." },
+  { os: "Android (Termux)", cmd: "(same Linux curl)",                                                                                    note: "Auto-detects $TERMUX_VERSION; pip extras .[termux]" },
+  { os: "Nix / NixOS",      cmd: "nix develop  (flake.nix at repo root)",                                                                note: "Reproducible. First-class deployment target." },
+  { os: "From source",      cmd: "git clone https://github.com/NousResearch/hermes-agent.git && cd hermes-agent && ./setup-hermes.sh",    note: "For contributors" },
+];
+
+const pitfalls = [
+  { sym: "hermes: command not found right after install",
+    fix: "Shell hasn't reloaded. source ~/.bashrc or source ~/.zshrc, or open a new terminal. If still missing: export PATH=\"$HOME/.local/bin:$PATH\"" },
+  { sym: "Install fails on Python version",
+    fix: "Installer uses uv to bring Python 3.11. If uv download fails (offline/proxy): sudo apt install python3.11 (Debian) or brew install python@3.11 (macOS). Never use sudo pip on the system Python." },
+  { sym: "OAuth callback fails on headless / SSH session",
+    fix: "Tunnel the callback: ssh -L 8888:localhost:8888 user@remote then on remote HERMES_OAUTH_CALLBACK_PORT=8888 hermes model. Alt: do OAuth locally and scp ~/.hermes/.env to remote." },
+  { sym: "nvm / pyenv / asdf invisible inside Hermes",
+    fix: "Hermes snapshots via bash -l (login shell). Add init scripts via terminal.shell_init_files: [~/.bashrc, ~/.nvm/nvm.sh] in config.yaml" },
+  { sym: "Windows native: hermes gateway won't start as a service",
+    fix: "WSL2's systemd is unreliable. Use hermes gateway run in tmux or Windows Task Scheduler to launch on login." },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/how-to/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="how-to" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="ht-page">
+      <section class="ht-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · HOW-TO</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>OPS GUIDE ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">RUN</span>
+          <span class="hc-title-line hc-title-accent">IT IN PRODUCTION</span>
+        </h1>
+        <p class="hc-tag">LOCAL · VPS · HARDEN · TUNE · MONITOR</p>
+        <p class="hc-subtag">
+          From <code>pip install</code> to a hardened VPS gateway. Local setup, production deployment, security, optimization, and day-2 operations — every command source-grounded against <code>{HERMES_TAG}</code>.
+        </p>
+      </section>
+
+      <!-- QUICKSTART -->
+      <section class="ht-quick" aria-label="60-second quickstart">
+        <h2 class="in-h">▸ 60-SECOND QUICKSTART</h2>
+        <pre class="ht-code"><code>{`# 1. install
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+source ~/.bashrc
+
+# 2. setup (interactive wizard — provider, auth, model)
+hermes setup
+
+# 3. first chat (script mode, prints answer and exits)
+hermes chat -q "hello"
+
+# 4. seed identity (one-time)
+$EDITOR ~/.hermes/SOUL.md            # personality
+$EDITOR ./AGENTS.md                  # per-project conventions
+
+# 5. interactive REPL
+hermes`}</code></pre>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          {sections.map((s) => (
+            <li>
+              <a href={`#s${s.n}`}>
+                <span class="in-toc-n">{String(s.n).padStart(2, "0")}</span>
+                <span class="in-toc-title" set:html={s.title}></span>
+                <span class="in-toc-tag">{s.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §1 LOCAL INSTALL ===== -->
+      <section id="s1" class="ht-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">01</span>
+          <h2>Local install · first chat</h2>
+          <span class="in-mod-tag">setup</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> One curl line on Linux/macOS/WSL/Termux. PowerShell one-liner on Windows native (beta). The installer pulls <code>uv</code>, Python 3.11, Node 22, ripgrep, ffmpeg. <code>hermes setup</code> writes auth + provider config. <code>hermes chat -q "hi"</code> is the smoke test.</p>
+
+        <h3 class="in-h3">Install matrix</h3>
+        <table class="in-table">
+          <thead>
+            <tr><th>OS / path</th><th>Command</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            {installMatrix.map((row) => (
+              <tr>
+                <td><code>{row.os}</code></td>
+                <td class="ht-cmd"><code>{row.cmd}</code></td>
+                <td>{row.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p class="in-note-dim">Disk footprint: ~200–400 MB (venv + node_modules); PortableGit adds ~50 MB on Windows.</p>
+
+        <h3 class="in-h3">First-run wizard</h3>
+        <p><code>hermes setup</code> walks you through provider → auth → model → personality → tools → gateway → systemd (Linux). Skippable per-section; re-enter via <code>hermes setup &lt;section&gt;</code> (e.g. <code>hermes setup model</code>).</p>
+
+        <p>What lands on disk:</p>
+        <pre class="ht-code"><code>{`~/.hermes/
+├── .env              # API keys (chmod 0600)
+├── config.yaml       # Non-secret settings, model choice
+├── SOUL.md           # Personality template
+├── state.db          # SQLite — sessions, messages, token counters
+├── memories/         # MEMORY.md (agent facts) + USER.md (user profile)
+├── skills/           # Installed skills (SKILL.md format)
+├── sessions/
+├── profiles/         # Isolated instances
+├── logs/
+└── hermes-agent/     # Code + venv`}</code></pre>
+
+        <h3 class="in-h3">Provider auth — OAuth vs API key</h3>
+        <p><b>OAuth (browser-based):</b> ChatGPT/Codex (ChatGPT Pro), xAI Grok (SuperGrok), MiniMax. Callback listens on <code>localhost:8888</code> by default.</p>
+
+        <p class="in-note"><b>OAuth-over-SSH gotcha.</b> Remote machines can't open the OAuth browser, and the callback can't reach across the network. Two fixes:</p>
+        <pre class="ht-code"><code>{`# Option A — SSH tunnel the callback port (preferred for remote)
+ssh -L 8888:localhost:8888 user@remote-host
+# On remote:
+HERMES_OAUTH_CALLBACK_PORT=8888 hermes model
+
+# Option B — do OAuth locally, copy the result
+# (locally) hermes model    → completes browser auth
+scp ~/.hermes/.env user@remote-host:~/.hermes/.env`}</code></pre>
+
+        <p><b>API key (write to <code>~/.hermes/.env</code>):</b></p>
+        <pre class="ht-code"><code>{`OPENROUTER_API_KEY=sk-or-...
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk-...           # also Whisper STT
+XAI_API_KEY=xai-...            # alt to xAI OAuth
+DASHSCOPE_API_KEY=...          # Qwen Cloud (former Alibaba)
+FIRECRAWL_API_KEY=...          # web scraping
+GITHUB_TOKEN=...               # git operations`}</code></pre>
+
+        <p>Or scripted: <code>hermes config set OPENROUTER_API_KEY sk-or-...</code> auto-routes secrets to <code>.env</code> and non-secrets to <code>config.yaml</code>.</p>
+
+        <h3 class="in-h3">Profile isolation pattern</h3>
+        <p>Each profile is a fully separate Hermes universe — own config, memory, skills, sessions, allowlist. Community convention: <b>one profile per domain</b>.</p>
+        <pre class="ht-code"><code>{`hermes profile create coding              # new empty profile
+hermes profile create coding --clone-all  # duplicate current
+hermes profile switch coding              # activate
+hermes -p coding chat                     # invoke specific profile
+hermes profile list                       # show all
+hermes profile export work -o backup.tar.gz   # share / migrate
+hermes profile import backup.tar.gz --name restored`}</code></pre>
+
+        <p>Typical split: <code>coding</code> (projects) · <code>research</code> (literature, web) · <code>ops</code> (infra, shell) · <code>personal</code> (calendar, day-to-day). Different SOUL.md + different model is the trigger to fork — not just "different topic".</p>
+
+        <h3 class="in-h3">Lazy-install behavior (v0.14)</h3>
+        <p>Optional integrations <i>don't</i> ship in the base install — first invocation triggers a <code>pip install</code> subprocess in the background. Affected: Slack, Matrix, Feishu, DingTalk, image-gen SDKs, voice/TTS providers. Expect a 30–120 s pause and ~50–200 MB disk growth per extra.</p>
+        <p>To pre-install (going offline / building a Docker image):</p>
+        <pre class="ht-code"><code>{`pip install 'hermes-agent[slack,matrix,image-gen,voice]'`}</code></pre>
+
+        <h3 class="in-h3">Identity files — minimum viable</h3>
+        <p>Priority chain (highest to lowest, only one loads per workdir walk): <code>.hermes.md</code> → <code>AGENTS.md</code> → <code>CLAUDE.md</code> → <code>.cursorrules</code>.</p>
+        <pre class="ht-code"><code>{`# ~/.hermes/SOUL.md (global personality, first thing in system prompt)
+You are a focused software engineering assistant.
+Think step-by-step, write idiomatic code, ask clarifying questions
+before assuming. Prioritize correctness over speed.
+
+# ./AGENTS.md (per-project; auto-discovered from working dir)
+This repo uses TypeScript strict mode and 2-space indent.
+Tests: pnpm test. Lint: pnpm lint.
+The auth module is in src/auth/; don't touch src/legacy/.`}</code></pre>
+
+        <h3 class="in-h3">Top 5 first-time pitfalls</h3>
+        <table class="in-table">
+          <thead><tr><th>Symptom</th><th>Fix</th></tr></thead>
+          <tbody>
+            {pitfalls.map((p) => (
+              <tr>
+                <td>{p.sym}</td>
+                <td>{p.fix}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===== §2 VPS DEPLOYMENT ===== -->
+      <section id="s2" class="ht-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">02</span>
+          <h2>VPS / dedicated deployment</h2>
+          <span class="in-mod-tag">production</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> One gateway process. Webhooks on <b>:8644</b>. OpenAI-compat API on <b>:8642</b> (loopback). Reverse proxy on <b>:443</b> (Caddy auto-TLS or nginx + certbot). Real cert mandatory — Microsoft Graph, Slack, Teams reject self-signed. Hetzner CX23 (2 vCPU / 4 GB / 40 GB, ~€4/mo) is the community-settled minimum for 24/7.</p>
+
+        <h3 class="in-h3">Topology</h3>
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 380" role="img" aria-labelledby="figT-title" class="in-svg">
+            <title id="figT-title">Hermes Agent — VPS topology</title>
+
+            <!-- Internet bar -->
+            <rect x="280" y="14" width="160" height="34" class="svg-plane svg-plane-c"/>
+            <text x="360" y="36" class="svg-step-t" text-anchor="middle">Internet :443 HTTPS</text>
+
+            <!-- arrow down -->
+            <line x1="360" y1="48" x2="360" y2="68" class="svg-step-line"/>
+
+            <!-- Reverse proxy -->
+            <rect x="120" y="70" width="480" height="58" class="svg-plane svg-plane-b"/>
+            <text x="140" y="92" class="svg-plane-label">REVERSE PROXY · Caddy or nginx</text>
+            <text x="140" y="112" class="svg-plane-sub">TLS termination · Let's Encrypt · path-based routing</text>
+
+            <!-- arrows split -->
+            <line x1="280" y1="128" x2="240" y2="160" class="svg-step-line"/>
+            <line x1="440" y1="128" x2="480" y2="160" class="svg-step-line"/>
+
+            <!-- Gateway box (left) -->
+            <rect x="60" y="160" width="320" height="100" class="svg-plane svg-plane-a"/>
+            <text x="80" y="184" class="svg-plane-label">GATEWAY · port 8644</text>
+            <text x="80" y="206" class="svg-plane-sub">22 platform adapters in ONE process</text>
+            <text x="80" y="226" class="svg-plane-files">webhooks: Teams · Slack · Discord · GitHub · GitLab</text>
+            <text x="80" y="246" class="svg-plane-files-dim">outbound: Telegram · WhatsApp · Matrix · Signal · …</text>
+
+            <!-- API server box (right) -->
+            <rect x="400" y="160" width="260" height="100" class="svg-plane svg-plane-cross"/>
+            <text x="420" y="184" class="svg-plane-label">API SERVER · 127.0.0.1:8642</text>
+            <text x="420" y="206" class="svg-plane-sub">OpenAI-compat /v1/* endpoint</text>
+            <text x="420" y="226" class="svg-plane-files">Codex · Aider · Cline · Continue</text>
+            <text x="420" y="246" class="svg-plane-files-dim">loopback by default — proxy + key to expose</text>
+
+            <!-- Storage row -->
+            <rect x="60" y="288" width="600" height="60" class="svg-table"/>
+            <text x="80" y="312" class="svg-table-h-t">STATE · ~/.hermes/</text>
+            <text x="80" y="332" class="svg-table-col">state.db (SQLite v11) · ChromaDB vector store · SOUL.md · skills/ · sessions/ · checkpoints/</text>
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;1 — VPS topology. Reverse proxy fronts everything; gateway and API server stay loopback-bound until TLS-fronted.</figcaption>
+        </figure>
+
+        <h3 class="in-h3">Gateway as a system service</h3>
+        <pre class="ht-code"><code>{`# Linux — user-scope systemd (recommended; lingering enables survival after logout)
+hermes gateway install
+# → ~/.config/systemd/user/hermes-gateway.service
+
+# Linux — system-scope (runs as root)
+hermes gateway install --system
+# → /etc/systemd/system/hermes-gateway.service
+
+# macOS — launchd agent
+hermes gateway install
+# → ~/Library/LaunchAgents/ai.hermes.gateway.plist
+
+# Lifecycle
+hermes gateway start   # launch
+hermes gateway stop    # halt
+hermes gateway restart # full stop-start
+hermes gateway status  # active flag + adapter health
+hermes gateway run     # foreground (debugging, tmux, Docker)`}</code></pre>
+
+        <p><b>Reload without restart:</b> <code>kill -USR1 $(cat ~/.hermes/gateway.pid)</code> — async graceful restart that does not drop persistent connections.</p>
+
+        <h3 class="in-h3">Caddy snippet (auto-TLS)</h3>
+        <pre class="ht-code"><code>{`# Caddyfile — Caddy obtains + renews the cert automatically
+hermes.example.com {
+    handle /webhooks/* {
+        reverse_proxy localhost:8644
+    }
+    handle /api/messages {
+        # Teams Bot Framework webhook (rewrites to a hermes route)
+        rewrite * /webhooks/teams{uri}
+        reverse_proxy localhost:8644
+    }
+    handle /v1/* {
+        # OpenAI-compat API — only expose with API_SERVER_KEY set
+        reverse_proxy localhost:8642
+    }
+}`}</code></pre>
+
+        <h3 class="in-h3">nginx snippet (certbot)</h3>
+        <pre class="ht-code"><code>{`server {
+    listen 443 ssl;
+    server_name hermes.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/hermes.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/hermes.example.com/privkey.pem;
+
+    location /webhooks/ {
+        proxy_pass         http://127.0.0.1:8644;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /api/messages {
+        proxy_pass         http://127.0.0.1:8644/webhooks/teams;
+        proxy_set_header   Host $host;
+    }
+
+    location /v1/ {
+        proxy_pass         http://127.0.0.1:8642;
+        proxy_set_header   Authorization $http_authorization;
+    }
+}`}</code></pre>
+
+        <h3 class="in-h3">Hermes proxy on a remote</h3>
+        <p>The OpenAI-compatible API gives full access to Hermes's toolset — <b>including terminal commands</b>. Never bind to <code>0.0.0.0</code> without both a bearer key and TLS in front.</p>
+        <pre class="ht-code"><code>{`# ~/.hermes/.env
+API_SERVER_ENABLED=true
+API_SERVER_PORT=8642
+API_SERVER_HOST=127.0.0.1                  # loopback by default
+API_SERVER_KEY=<long-random-token>         # REQUIRED if HOST != 127.0.0.1
+API_SERVER_CORS_ORIGINS=https://webui.example.com
+API_SERVER_MODEL_NAME=hermes-default       # advertised in /v1/models
+
+# Gateway proxy mode (thin gateway forwards to remote API server)
+GATEWAY_PROXY_URL=https://hermes.example.com/v1`}</code></pre>
+
+        <h3 class="in-h3">Multi-user pairing</h3>
+        <pre class="ht-code"><code>{`# Unknown user DMs the bot → gateway issues one-time code (1h, rate-limited).
+# Admin approves from the server shell:
+hermes pairing list                              # see pending codes
+hermes pairing approve telegram XKGH5N7P         # approve code
+hermes pairing revoke telegram <user-id>         # remove access
+hermes pairing clear-pending                     # flush pending
+
+# Per-platform allowlists (~/.hermes/.env)
+TELEGRAM_ALLOWED_USERS=123456789,987654321
+SLACK_ALLOWED_USERS=U012AB3CD
+DISCORD_ALLOWED_USERS=123456789012345678
+TEAMS_ALLOWED_USERS=user@corp.com
+GATEWAY_ALLOWED_USERS=admin_id_here              # global fallback
+
+# DANGER: bypass all pairing/allowlist checks
+# With terminal tools enabled, this is equivalent to shell access for anyone
+GATEWAY_ALLOW_ALL_USERS=true                     # NEVER in production`}</code></pre>
+
+        <h3 class="in-h3">Headless / non-interactive (server-side)</h3>
+        <pre class="ht-code"><code>{`# Pick ONE — never multiple
+HERMES_ACCEPT_HOOKS=1                      # env var (preferred for EnvironmentFile)
+# or
+hermes gateway run --accept-hooks          # CLI flag (foreground)
+# or
+# ~/.hermes/config.yaml
+hooks_auto_accept: true
+
+# Pair with a tight shell-hooks allowlist so only pre-approved hook
+# shapes auto-fire. See §3 Security Hardening for the allowlist gotcha.`}</code></pre>
+
+        <h3 class="in-h3">Backup &amp; restore</h3>
+        <pre class="ht-code"><code>{`# Full backup (safe while running — uses SQLite backup API)
+hermes backup -o /mnt/backups/hermes-$(date +%F).zip
+
+# Quick state-only snapshot (pre-upgrade safety net)
+hermes backup --quick --label pre-upgrade
+
+# Restore on new machine
+hermes import /mnt/backups/hermes-2026-05-17.zip
+
+# Roll back specific labeled snapshot
+hermes backup restore --state pre-upgrade
+
+# Cron for offsite copies
+0 2 * * * hermes backup -o /mnt/backups/hermes-$(date +\\%F).zip && \\
+          rclone copy /mnt/backups/ remote:hermes-backups/`}</code></pre>
+        <p class="in-note-dim">What ships in the zip: <code>~/.hermes/</code> tree (state.db, ChromaDB, skills, config, .env, pairing, checkpoints). Binary excluded — reinstall on the target, then import.</p>
+
+        <h3 class="in-h3">Resource sizing</h3>
+        <table class="in-table">
+          <thead><tr><th>Tier</th><th>vCPU</th><th>RAM</th><th>Disk</th><th>Use case</th></tr></thead>
+          <tbody>
+            <tr><td>Minimum</td><td>2</td><td>4 GB</td><td>40 GB SSD</td><td>Single user, API LLM, no browser tools</td></tr>
+            <tr><td><b>Recommended</b></td><td><b>4</b></td><td><b>8 GB</b></td><td><b>80 GB SSD</b></td><td>Multi-user, browser automation, image gen</td></tr>
+            <tr><td>Heavy</td><td>8</td><td>16 GB</td><td>160 GB SSD</td><td>Multiple profiles or local model inference</td></tr>
+          </tbody>
+        </table>
+        <p class="in-note-dim">Where costs concentrate: RAM (ChromaDB + cached agents up to 128), CPU (LLM inference + browser eval), Disk (~/.hermes/ grows ~1–2 GB/month under normal use). Community baseline for 24/7: <b>Hetzner CX23, ~€4/mo</b>.</p>
+      </section>
+
+      <!-- ===== §3 SECURITY HARDENING ===== -->
+      <section id="s3" class="ht-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">03</span>
+          <h2>Security hardening</h2>
+          <span class="in-mod-tag">security</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Twelve controls. The high-leverage ones: Tirith scanner with <code>fail_open: false</code>, Docker terminal backend, SSRF blocking on both <code>security.*</code> and <code>browser.*</code>, <code>approvals.mode: manual</code>, supply-chain audit cadence post-Mistral incident, and — the one trap nobody talks about — the hook allowlist <i>records</i> script mtime but never <i>checks</i> it.</p>
+
+        <h3 class="in-h3">The 12-control checklist</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+security:
+  # 01 — opt-in secret redaction on tool output (regex pass, ~1-3ms/output)
+  redact_secrets: true
+
+  # 02 — Tirith terminal command scanner (homograph URLs, curl|bash, escape injection)
+  tirith_enabled: true
+  tirith_path: "tirith"        # must be on PATH or in Docker image
+  tirith_timeout: 5            # seconds; fail-open by default
+  tirith_fail_open: false      # PRODUCTION: do not silently bypass on scanner crash
+
+  # 03 — SSRF block (link-local, RFC1918, ::1)
+  allow_private_urls: false
+
+  # 05 — disable runtime pip-install of backends (post-Mistral lesson)
+  allow_lazy_installs: false
+
+  # 06 — domain blocklist (point at a security-team-maintained shared file)
+  website_blocklist:
+    enabled: true
+    shared_files:
+      - "/etc/hermes/blocklist-shared.txt"
+
+browser:
+  # 03 (cont.) — SSRF block on the BROWSER tool too. independent flag.
+  allow_private_urls: false
+
+approvals:
+  # 04 — never "off" in production
+  mode: "manual"             # manual | smart | off
+  cron_mode: "deny"          # block autonomous cron approvals
+  destructive_slash_confirm: true
+
+terminal:
+  # 08 — Docker sandbox the terminal tool
+  backend: "docker"
+  docker_mount_cwd_to_workspace: false
+  lifetime_seconds: 300      # 5min reuse window amortizes 150-400ms cold start`}</code></pre>
+
+        <p class="in-note"><b>Per-platform allowlists.</b> Add to <code>~/.hermes/.env</code> alongside the gateway pairing flow from §2 — these are independent enforcement points. Slack: use Socket Mode (no public endpoint at all), not HTTP webhooks. Every webhook route must declare a secret or Hermes refuses to start; <code>INSECURE_NO_AUTH</code> is loopback-only.</p>
+
+        <h3 class="in-h3">The hook allowlist mtime-bypass (real attack class)</h3>
+        <p>When you approve a shell hook, <code>agent/shell_hooks.py</code> records <code>script_mtime_at_approval</code> in <code>~/.hermes/shell-hooks-allowlist.json</code>. But <code>_is_allowlisted()</code> only checks the <code>(event, command)</code> pair — it <b>never re-reads or validates the stored mtime at execution time</b>. Attack path: attacker writes a benign hook → user approves → attacker rewrites the script on disk → Hermes runs the malicious version without re-prompting.</p>
+
+        <p>Mitigation (defense in depth):</p>
+        <ol class="ht-list">
+          <li><b>Track the allowlist as a lockfile.</b> Add <code>~/.hermes/shell-hooks-allowlist.json</code> to your dotfiles repo. <code>git diff</code> on the file is your audit trail.</li>
+          <li><b>Pre-run integrity check.</b> Compare each approved script's current mtime against the recorded value — fail if drift detected:</li>
+        </ol>
+        <pre class="ht-code"><code>{`#!/usr/bin/env bash
+# hermes-hook-audit.sh — run before hermes starts
+ALLOWLIST="$HOME/.hermes/shell-hooks-allowlist.json"
+jq -c '.[]' "$ALLOWLIST" | while read -r entry; do
+  cmd=$(echo "$entry" | jq -r '.command')
+  recorded=$(echo "$entry" | jq -r '.script_mtime_at_approval')
+  script_path=$(echo "$cmd" | awk '{print $1}')
+  if [[ -f "$script_path" ]]; then
+    actual=$(python3 -c "import os,datetime;\\
+print(datetime.datetime.utcfromtimestamp(os.path.getmtime('$script_path')).isoformat())")
+    if [[ "$actual" != "$recorded" ]]; then
+      echo "HOOK INTEGRITY FAIL: $script_path mtime changed since approval"
+      exit 1
+    fi
+  fi
+done`}</code></pre>
+        <ol class="ht-list" start="3">
+          <li><b>Rebuild allowlist in CI.</b> Don't ship the JSON file as a static artifact — run <code>HERMES_ACCEPT_HOOKS=1 hermes ...</code> against a clean checkout so approved <code>(event, command)</code> pairs always match known-good script states.</li>
+        </ol>
+
+        <h3 class="in-h3">Webhook signature verification (per-platform)</h3>
+        <table class="in-table">
+          <thead><tr><th>Platform</th><th>Header</th><th>Method</th></tr></thead>
+          <tbody>
+            <tr><td>GitHub</td><td><code>X-Hub-Signature-256</code></td><td>HMAC-SHA256 with <code>sha256=</code> prefix</td></tr>
+            <tr><td>GitLab</td><td><code>X-Gitlab-Token</code></td><td>Plain secret-string match</td></tr>
+            <tr><td>Generic</td><td><code>X-Webhook-Signature</code></td><td>Raw HMAC-SHA256 hex digest</td></tr>
+            <tr><td>Slack</td><td>N/A · Socket Mode</td><td>WebSocket auth — <b>no public endpoint</b></td></tr>
+            <tr><td>Teams</td><td>JWT (Microsoft Graph)</td><td>Bot Framework verification</td></tr>
+          </tbody>
+        </table>
+        <p class="in-note-dim">Defaults: rate limit 30 req/min per route (fixed window), 1 MB payload cap. Idempotency keys (<code>X-GitHub-Delivery</code>, <code>X-Request-ID</code>) cached 1h — duplicate deliveries silently ack'd, replay-driven duplicate executions prevented.</p>
+
+        <h3 class="in-h3">Supply-chain audit (post-Mistral lesson)</h3>
+        <p><code>pyproject.toml</code> ships with all deps pinned exactly (<code>==X.Y.Z</code>). After the 2026-05-12 Mistral PyPI quarantine, the <code>mistralai</code> provider was removed entirely; <code>requests==2.33.0</code> + <code>PyJWT[crypto]==2.12.1</code> patch CVE-2026-25645 / CVE-2026-32597. Weekly cadence:</p>
+        <pre class="ht-code"><code>{`pip-audit --requirement <(uv export --no-hashes)
+
+# Verify installed = pinned
+uv pip list --format=freeze | sort > installed.txt
+diff pinned-requirements.txt installed.txt`}</code></pre>
+
+        <h3 class="in-h3">Profile isolation as defense in depth</h3>
+        <p>One Hermes profile per role / environment. Separate API keys per profile. If <code>dev-sandbox</code> is compromised, the <code>prod-readonly</code> key is not exposed. Combine with <code>TERMINAL_BACKEND=docker</code> for an isolated container namespace per profile.</p>
+        <pre class="ht-code"><code>{`hermes --profile=prod-readonly      # production, narrow tools, separate key
+hermes --profile=dev-sandbox        # local exploration, dangerous-OK
+hermes --profile=research           # web + memory, no terminal`}</code></pre>
+      </section>
+
+      <!-- ===== §4 PERFORMANCE & COST OPTIMIZATION ===== -->
+      <section id="s4" class="ht-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">04</span>
+          <h2>Performance &amp; cost optimization</h2>
+          <span class="in-mod-tag">optimization</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Cache <code>SOUL.md</code> + <code>AGENTS.md</code> + static skills before the breakpoint. Keep dynamic recall AFTER the breakpoint. Set <code>cache_ttl: "1h"</code> for Claude — ~90% input-cost reduction on 100K-token system prompts. Monitor <code>cache_read_tokens / input_tokens</code> in <code>state.db</code> — drops mean the cacheable prefix is leaking dynamic content.</p>
+
+        <h3 class="in-h3">Prompt cache — stable-prefix discipline</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+prompt_caching:
+  cache_ttl: "1h"   # "5m" | "1h" — use "1h" in production`}</code></pre>
+
+        <table class="in-table">
+          <thead><tr><th>Put EARLY (cacheable)</th><th>Put LATE (after breakpoint)</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>SOUL.md</code> · persona, core capabilities · rarely changes</td>
+              <td>Dynamic memory recall results · per-turn</td>
+            </tr>
+            <tr>
+              <td><code>AGENTS.md</code> · available tools + schemas · changes only on tool updates</td>
+              <td>Current date / time injections</td>
+            </tr>
+            <tr>
+              <td>Static skill definitions loaded at startup</td>
+              <td>Conversation history summaries</td>
+            </tr>
+            <tr>
+              <td>Project conventions in <code>.hermes.md</code></td>
+              <td>Per-user / per-session context</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="in-note-dim">For Grok, <code>x-grok-conv-id</code> header gives cross-session cache reuse with 1h persistence (handled automatically by Hermes when the Grok plugin is active).</p>
+
+        <h3 class="in-h3">Fallback model chain</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+providers:
+  fallback_providers:
+    - "openrouter:google/gemini-3-flash-preview"
+    - "openrouter:anthropic/claude-haiku-4"`}</code></pre>
+
+        <table class="in-table">
+          <thead><tr><th>Lever</th><th>Implication</th></tr></thead>
+          <tbody>
+            <tr><td>Cost</td><td>Flash / Haiku are 10–20× cheaper than Opus-class — appropriate for routine fallback</td></tr>
+            <tr><td>Quality</td><td>Fallback fires on <i>availability</i>, not <i>complexity</i> — a hard task may silently degrade</td></tr>
+            <tr><td>Latency</td><td>OpenRouter adds ~100–300 ms routing overhead vs direct provider</td></tr>
+            <tr><td>Billing</td><td>Billed to the fallback provider key — use <code>credential_pool_strategies</code> with its own cost limit</td></tr>
+          </tbody>
+        </table>
+        <p class="in-note"><b>Pattern.</b> Enable fallback for production availability, but pair with <code>approvals.mode: "manual"</code> — the agent will prompt before irreversible actions if running on a degraded model. Audit how often fallback fires via the <code>billing_provider</code> column in <code>state.db</code>.</p>
+
+        <h3 class="in-h3">Compression tuning</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+compression:
+  enabled: true
+  threshold: 0.50      # compress at 50% of model's context limit
+  target_ratio: 0.20   # compress middle turns down to 20% of original
+  protect_last_n: 20   # never compress the 20 most recent turns
+  protect_first_n: 3   # never compress the 3 oldest (initial context / SOUL)`}</code></pre>
+
+        <ul class="ht-list">
+          <li><b>Eager compression.</b> <code>threshold: 0.30</code> for sessions with long tool outputs (file reads, web scrapes) — prevents hitting context limits mid-task.</li>
+          <li><b>Aggressive ratio.</b> <code>target_ratio: 0.10</code> for cost-sensitive workloads. Risk: compressed summaries lose detail. Validate task recovery on your workload first.</li>
+          <li><b>Protect more recents.</b> <code>protect_last_n: 40</code> for long agentic workflows where the agent needs recent tool output to continue.</li>
+          <li><b>Disable.</b> <code>enabled: false</code> if sessions rarely cross 30K tokens — LLM-summarization cost isn't worth it for short interactions.</li>
+        </ul>
+
+        <h3 class="in-h3">Cost monitoring via state.db</h3>
+        <p><code>state.db</code> tracks per-session <code>estimated_cost_usd</code>, <code>actual_cost_usd</code>, full token breakdown (<code>input_tokens</code> / <code>output_tokens</code> / <code>cache_read_tokens</code> / <code>cache_write_tokens</code> / <code>reasoning_tokens</code>), <code>api_call_count</code>, and <code>billing_provider</code>.</p>
+        <pre class="ht-code"><code>{`# Per-day total cost + API call volume
+sqlite3 ~/.hermes/state.db "
+  SELECT date(created_at), SUM(actual_cost_usd), SUM(api_call_count)
+  FROM sessions
+  WHERE created_at > datetime('now','-30 day')
+  GROUP BY 1
+  ORDER BY 1 DESC;"`}</code></pre>
+
+        <p>Alert thresholds worth setting:</p>
+        <ul class="ht-list">
+          <li><b><code>actual_cost_usd</code> daily total</b> — alert at 2× baseline. Spike → prompt-injection loop or runaway agentic task.</li>
+          <li><b><code>cache_read_tokens / input_tokens</code> ratio</b> — should be <b>&gt; 50%</b> in healthy production use. Drop means the cacheable prefix is leaking dynamic content. Fix: move recall / time-stamp content AFTER the breakpoint.</li>
+          <li><b><code>api_call_count</code> per session</b> — over 100 = likely looping. Set a session-level alert.</li>
+          <li><b><code>reasoning_tokens</code></b> — nonzero only with extended thinking enabled. Can dominate cost on complex tasks; track separately.</li>
+          <li><b><code>billing_provider</code> distribution</b> — if fallback shows up often, audit primary-provider reliability.</li>
+        </ul>
+
+        <h3 class="in-h3">Lazy-install pre-warm (CI / Docker)</h3>
+        <p>With <code>allow_lazy_installs: true</code> (default), first access of a backend triggers <code>pip install</code> at runtime — outside your lockfile. Mitigation is pre-warm at build time:</p>
+        <pre class="ht-code"><code>{`# Dockerfile — pre-install all backend extras at build time
+RUN uv pip install 'hermes-agent[slack,matrix,image-gen,voice,code,browser,terminal]'
+
+# Then in config:
+# security.allow_lazy_installs: false`}</code></pre>
+        <p class="in-note-dim">Same pattern works locally: <code>pip install 'hermes-agent[slack,matrix,image-gen]'</code> before going offline.</p>
+      </section>
+
+      <!-- ===== §5 DAY-2 OPS ===== -->
+      <section id="s5" class="ht-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>Day-2 ops &amp; troubleshooting</h2>
+          <span class="in-mod-tag">monitoring</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Triage loop: <code>hermes doctor</code> → <code>hermes status --deep</code> → <code>hermes logs errors -f</code>. Token / cost analytics via <code>hermes insights --days N</code>. Recovery via <code>hermes checkpoints</code>. Backup before every upgrade.</p>
+
+        <h3 class="in-h3">Standard operations checklist</h3>
+        <ul class="ht-list">
+          <li><b>Health check.</b> <code>hermes doctor [--fix]</code> — diagnoses missing keys, broken config, dependency gaps. Run after every upgrade.</li>
+          <li><b>Deep status.</b> <code>hermes status --deep</code> — adapter connectivity, session store integrity. Beyond the service-active flag.</li>
+          <li><b>Usage analytics.</b> <code>hermes insights --days 30 [--source telegram]</code> — token/cost/activity breakdown for right-sizing LLM plans.</li>
+          <li><b>Log triage.</b> <code>hermes doctor</code> → <code>hermes status --deep</code> → <code>hermes logs errors -f</code> — fastest path from "broken" to root cause.</li>
+          <li><b>Log rotation.</b> <code>hermes config set logging.max_size_mb 100</code>; for journald, <code>SystemMaxUse=500M</code> in <code>/etc/systemd/journald.conf</code>.</li>
+          <li><b>Checkpoint hygiene.</b> <code>hermes checkpoints status</code> for total size; <code>hermes checkpoints prune --retention-days 7 --max-size-mb 500</code> for cleanup.</li>
+          <li><b>Wedged session.</b> <code>hermes checkpoints list</code> → <code>/rollback</code> in chat, or <code>hermes checkpoints prune --force</code> to clear corrupt state.</li>
+          <li><b>Service reload without downtime.</b> <code>kill -USR1 $(cat ~/.hermes/gateway.pid)</code>.</li>
+          <li><b>Upgrade flow.</b> <code>hermes backup --quick --label pre-upgrade</code> → upgrade binary → <code>hermes gateway restart</code> → <code>hermes doctor</code>.</li>
+          <li><b>Pairing audit.</b> <code>hermes pairing list</code> weekly. Confirm <code>GATEWAY_ALLOW_ALL_USERS</code> absent or <code>false</code>.</li>
+          <li><b>Backup verification.</b> Restore to a staging instance monthly with <code>hermes import &lt;zip&gt; --force</code>. Confirm ChromaDB + sessions intact.</li>
+          <li><b>Disk pressure.</b> <code>df -h</code> + <code>du -sh ~/.hermes/</code> + <code>hermes sessions stats</code>; prune checkpoints when <code>~/.hermes/</code> exceeds 70%.</li>
+        </ul>
+
+        <h3 class="in-h3">Log locations</h3>
+        <table class="in-table">
+          <thead><tr><th>Platform</th><th>Command</th></tr></thead>
+          <tbody>
+            <tr><td>Linux (systemd)</td><td><code>journalctl --user -u hermes-gateway -f</code></td></tr>
+            <tr><td>macOS (launchd)</td><td><code>tail -f ~/.hermes/logs/gateway.log</code></td></tr>
+            <tr><td>Any (CLI)</td><td><code>hermes logs gateway</code> · <code>hermes logs errors -f</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · HOW-TO · MIT · {new Date().getFullYear()} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .ht-page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .ht-banner {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .ht-banner .hc-subtag {
+        margin-top: 1rem;
+        max-width: 42rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .ht-quick {
+        background: var(--color-surface);
+        border: 1px solid var(--color-gold);
+        border-left: 4px solid var(--color-gold);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 2.5rem;
+      }
+      .ht-quick .in-h {
+        color: var(--color-gold);
+        margin-bottom: 0.85rem;
+      }
+
+      .ht-code {
+        background: var(--color-bg);
+        border: 1px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: var(--color-fg);
+        overflow-x: auto;
+        line-height: 1.55;
+        margin: 0.4rem 0 1rem;
+      }
+      .ht-code code {
+        background: transparent;
+        padding: 0;
+        color: inherit;
+      }
+      .ht-cmd code {
+        font-size: 0.78rem;
+      }
+
+      .ht-mod {
+        margin-bottom: 3.5rem;
+      }
+      .ht-mod.ht-pending {
+        opacity: 0.78;
+        border-left: 2px dashed var(--color-bronze);
+        padding-left: 1rem;
+      }
+
+      .ht-list {
+        margin: 0.5rem 0 1rem;
+        padding-left: 1.4rem;
+        line-height: 1.65;
+        font-size: 0.95rem;
+      }
+      .ht-list li {
+        margin-bottom: 0.55rem;
+        color: var(--color-fg);
+      }
+      .ht-list code {
+        background: var(--color-surface-mid);
+        color: var(--color-amber);
+        padding: 0.05rem 0.3rem;
+        font-size: 0.85em;
+      }
+      .ht-list b {
+        color: var(--color-gold);
+      }
+
+      .ht-mod p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 1rem;
+        font-size: 0.97rem;
+      }
+      .ht-mod p code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.86em;
+      }
+      .ht-mod p b { color: var(--color-gold); }
+      .ht-mod p i { color: var(--color-fg-dim); }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #f7f7f5;
+          --color-surface-mid: #efefea;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .ht-mod { break-inside: avoid; }
+        .ht-pending { opacity: 1; }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
+  </body>
+</html>
