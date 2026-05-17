@@ -1,0 +1,1103 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Internals · v${HERMES_VERSION}`;
+const pageDesc = `Reverse-engineered tour of Hermes Agent's source — three architectural planes, the entry pipeline, the session loop, hook dispatch reality, the SQLite schema, the gateway message pipeline. Source-grounded, not doc-grounded.`;
+
+const sections = [
+  { n: 1, slug: "carto",    title: "Repo cartography",        tag: "architecture" },
+  { n: 2, slug: "entry",    title: "The entry pipeline",      tag: "boot"         },
+  { n: 3, slug: "loop",     title: "The session loop",        tag: "runtime"      },
+  { n: 4, slug: "hooks",    title: "Hook dispatch — reality", tag: "extension"    },
+  { n: 5, slug: "state",    title: "Persistence (SQLite v11)",tag: "storage"      },
+  { n: 6, slug: "gateway",  title: "Gateway message pipeline",tag: "messaging"    },
+];
+
+const entrySteps = [
+  { n: "01", title: "hermes (cmd)",                  loc: "shell" },
+  { n: "02", title: "hermes_bootstrap",              loc: "UTF-8 stdio fix on Windows · no-op POSIX" },
+  { n: "03", title: "_apply_profile_override()",     loc: "reads --profile · sets HERMES_HOME" },
+  { n: "04", title: "env_loader",                    loc: "~/.hermes/.env + project .env merged" },
+  { n: "05", title: "logging init",                  loc: "centralized file logger" },
+  { n: "06", title: "argparse subparsers",           loc: "chat · gateway · setup · model · doctor · …" },
+  { n: "07", title: "cmd_chat(args)",                loc: "checks provider · selects TUI vs plain" },
+  { n: "08", title: "AIAgent (run_agent.py)",        loc: "~70-parameter constructor · agent_init.py" },
+  { n: "09", title: "HermesCLI (cli.py)",            loc: "prompt_toolkit REPL · slash commands" },
+  { n: "10", title: "run_conversation()",            loc: "agent/conversation_loop.py · LLM loop" },
+];
+
+const loopNodes = [
+  { label: "build api_kwargs",     dx: 0,    dy: -160 },
+  { label: "stream API call",      dx: 200,  dy: -80 },
+  { label: "parse response",       dx: 200,  dy: 80  },
+  { label: "dispatch tools (≤8)",  dx: 0,    dy: 160 },
+  { label: "append role=tool",     dx: -200, dy: 80  },
+  { label: "sanitize / dedup",     dx: -200, dy: -80 },
+];
+
+const docsHookSystems = ["shell hooks", "plugin hooks", "gateway hooks"];
+
+const sessionsCols = [
+  "id (TEXT PK)",
+  "source, user_id, model",
+  "model_config (JSON)",
+  "system_prompt",
+  "parent_session_id  ←──┐",
+  "started_at / ended_at (REAL)",
+  "end_reason",
+  "message_count, tool_call_count",
+  "input_tokens, output_tokens",
+  "cache_read_tokens, cache_write",
+  "reasoning_tokens",
+  "billing_provider, billing_mode",
+  "estimated_cost_usd, actual_cost",
+  "cost_status, pricing_version",
+  "title, handoff_state",
+];
+
+const messagesCols = [
+  "id (INTEGER PK AUTOINC)",
+  "session_id (FK ──→ sessions.id)",
+  "role, content",
+  "tool_call_id, tool_calls (JSON)",
+  "tool_name, timestamp (REAL)",
+  "token_count, finish_reason",
+  "reasoning, reasoning_content",
+  "reasoning_details",
+  "codex_reasoning_items",
+  "codex_message_items",
+];
+
+const gatewaySteps = [
+  { n: "01", title: "Platform adapter receives",        src: "gateway/platforms/slack.py · webhook/poll" },
+  { n: "02", title: "Normalize → MessageEvent",         src: "dataclass: text · media_urls · source · type" },
+  { n: "03", title: "merge_pending_message_event()",    src: "coalesce bursts" },
+  { n: "04", title: "MessageHandler dispatched",        src: "await self._message_handler(event)" },
+  { n: "05", title: "SessionStore.lookup_or_create",    src: "build_session_context_prompt() injects metadata" },
+  { n: "06", title: "HookRegistry.emit('agent:start')", src: "fire registered gateway hooks" },
+  { n: "07", title: "AIAgent (LRU-cached per session)", src: "run_conversation() runs the loop" },
+  { n: "08", title: "GatewayStreamConsumer.on_delta",   src: "queue → buffer → progressive message edit" },
+  { n: "09", title: "DeliveryRouter.deliver()",         src: "route: LOCAL md file · platform send · origin" },
+  { n: "10", title: "Post-delivery callbacks",          src: "background review · bubble cleanup" },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/internals/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="internals" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="in-page">
+      <section class="in-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · INTERNALS</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>SOURCE-GROUNDED ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">INSIDE</span>
+          <span class="hc-title-line hc-title-accent">THE BOX</span>
+        </h1>
+        <p class="hc-tag">REPO · ENTRY · LOOP · HOOKS · STATE · GATEWAY</p>
+        <p class="hc-subtag">
+          A reverse-engineering tour of Hermes Agent's actual source. What the code says, where the public docs diverge, and why those divergences matter. Every claim cites a file path in <a class="ix-inline-link" href="https://github.com/NousResearch/hermes-agent" rel="noopener">NousResearch/hermes-agent</a>@<code>{HERMES_TAG}</code>.
+        </p>
+      </section>
+
+      <!-- CORRECTIONS CALLOUT -->
+      <section class="in-corrections" aria-label="Documentation vs source divergences">
+        <h2 class="in-h">▸ DOCS-VS-SOURCE DIVERGENCES</h2>
+        <p class="in-corr-intro">Four claims commonly seen in Hermes write-ups that the source code does not back. Calling them out up front so the rest of the page makes sense.</p>
+        <ol class="in-corr-list">
+          <li>
+            <b>"3 hook systems"</b> — shell hooks and plugin hooks share <i>one</i> dispatcher.
+            <code>agent/shell_hooks.register_from_config()</code> injects subprocess closures directly into <code>PluginManager._hooks</code>. At runtime there are <b>two</b> dispatchers, not three: <code>PluginManager._hooks</code> (engine-side, shell+plugin unified) and <code>gateway/hooks.HookRegistry</code> (gateway-process, fully separate).
+          </li>
+          <li>
+            <b>"3 concurrent subagents default"</b> — the actual cap in <code>agent/tool_executor.py</code> is <code>_MAX_TOOL_WORKERS = 8</code> threads. There is no agent-level concurrency cap on subagent fan-out beyond per-budget iteration limits.
+          </li>
+          <li>
+            <b>"6 plugin categories"</b> — code has <b>5</b> <code>kind</code> values: <code>standalone</code>, <code>backend</code>, <code>exclusive</code>, <code>platform</code>, <code>model-provider</code>. The "6 categories" is documentation taxonomy mapped onto <code>kind=backend</code> sub-uses.
+          </li>
+          <li>
+            <b>"pre_gateway_dispatch" event</b> — does not exist in the source. Gateway lifecycle events are <code>gateway:startup</code> · <code>session:start/end/reset</code> · <code>agent:start/step/end</code> · <code>command:*</code>.
+          </li>
+        </ol>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          {sections.map((s) => (
+            <li>
+              <a href={`#s${s.n}`}>
+                <span class="in-toc-n">{String(s.n).padStart(2, "0")}</span>
+                <span class="in-toc-title">{s.title}</span>
+                <span class="in-toc-tag">{s.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §1 CARTOGRAPHY ===== -->
+      <section id="s1" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">01</span>
+          <h2>Repo cartography</h2>
+          <span class="in-mod-tag">architecture</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> The code splits along three planes: a <b>CLI surface</b> (<code>hermes_cli/</code>), an <b>engine</b> (<code>agent/</code> + root <code>run_agent.py</code>, <code>cli.py</code>), and <b>platform integrations</b> (<code>gateway/</code>, <code>acp_adapter/</code>, <code>web/</code>). Plus a surprise: ~10 top-level Python files at the repo root that are NOT inside any package — <code>sys.path.insert(0, PROJECT_ROOT)</code> is load-bearing.</p>
+
+        <p>The <code>hermes_cli/</code> package is the user-facing surface. Subcommands, config wizard, model selector, auth flows, plugin / skill registry, kanban board, theming. No LLM calls happen here — it wires up the engine and hands off.</p>
+
+        <p>The <b>engine</b> is split across <code>agent/</code> (the reasoning loop, prompt builder, tool executor, provider adapters) and <i>several flat-root files</i>: <code>cli.py</code> (647&nbsp;KB — the interactive <code>prompt_toolkit</code> REPL), <code>run_agent.py</code> (178&nbsp;KB — the <code>AIAgent</code> class), <code>hermes_state.py</code> (SQLite layer), <code>batch_runner.py</code>, <code>trajectory_compressor.py</code>, <code>mcp_serve.py</code>. Unusual for a modern Python project. The result is <i>two</i> entry paths: <code>hermes_cli.main:main</code> (the <code>[project.scripts]</code> entry, argparse-based) and <code>cli.py</code>'s <code>HermesCLI</code> class (the interactive loop), with <code>main.py</code> calling into <code>cli.py</code> for chat sessions.</p>
+
+        <p><b>Platform integrations</b> live under <code>gateway/</code> (22 messaging platforms — WhatsApp, Telegram, Slack, Discord, Teams, LINE, SimpleX, etc., each as an independent adapter under <code>gateway/platforms/</code>) and <code>acp_adapter/</code> (Agent Communication Protocol server for editor integrations like Zed and VS Code). The gateway has its own <code>HookRegistry</code> — a fully parallel hook bus that does not share state with the engine's <code>PluginManager</code>.</p>
+
+        <!-- INFOGRAPHIC A — three planes -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 380" role="img" aria-labelledby="figA-title" class="in-svg">
+            <title id="figA-title">Three architectural planes of Hermes Agent</title>
+            <!-- Plane C : Platform integrations (top) -->
+            <rect x="30" y="20"  width="660" height="80"  class="svg-plane svg-plane-c"/>
+            <text x="50"  y="46" class="svg-plane-label">PLANE C · PLATFORM INTEGRATIONS</text>
+            <text x="50"  y="68" class="svg-plane-sub">22 messaging platforms · ACP for editors · web UI</text>
+            <text x="50"  y="88" class="svg-plane-files">gateway/  ·  acp_adapter/  ·  tui_gateway/  ·  web/  ·  ui-tui/</text>
+
+            <!-- Plane B : Engine (middle) -->
+            <rect x="30" y="120" width="660" height="100" class="svg-plane svg-plane-b"/>
+            <text x="50"  y="146" class="svg-plane-label">PLANE B · ENGINE</text>
+            <text x="50"  y="168" class="svg-plane-sub">reasoning loop · prompt builder · tool dispatch · LLM adapters</text>
+            <text x="50"  y="188" class="svg-plane-files">agent/  ·  run_agent.py  ·  cli.py  ·  prompt_builder.py</text>
+            <text x="50"  y="208" class="svg-plane-files-dim">auxiliary_client.py · anthropic_adapter.py · gemini_native_adapter.py · …</text>
+
+            <!-- Plane A : CLI surface (bottom) -->
+            <rect x="30" y="240" width="660" height="80"  class="svg-plane svg-plane-a"/>
+            <text x="50"  y="266" class="svg-plane-label">PLANE A · CLI SURFACE</text>
+            <text x="50"  y="288" class="svg-plane-sub">subcommands · config · auth · plugin/skill mgmt · kanban · setup wizard</text>
+            <text x="50"  y="308" class="svg-plane-files">hermes_cli/  (~80 modules, no LLM calls)</text>
+
+            <!-- Cross-cutting -->
+            <rect x="30" y="340" width="660" height="28"  class="svg-plane svg-plane-cross"/>
+            <text x="50"  y="358" class="svg-plane-cross-label">CROSS-CUTTING · hermes_state.py · hermes_constants.py · config.py</text>
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;1 — three planes. Cleavage runs along user-facing chrome / reasoning loop / external IO.</figcaption>
+        </figure>
+
+        <h3 class="in-h3">Top 10 modules by file size</h3>
+        <p class="in-note-dim">As reported by GitHub Contents API. Big file ≠ much logic — config loaders and subcommand dispatchers are flat by nature. Still useful to see where the mass sits.</p>
+        <table class="in-table">
+          <thead>
+            <tr><th>Module</th><th>Size</th><th>Role</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>gateway/run.py</code></td><td>813&nbsp;KB</td><td>Gateway receive/dispatch loop for 22 platforms</td></tr>
+            <tr><td><code>cli.py</code> <i>(root)</i></td><td>647&nbsp;KB</td><td>Interactive TUI session manager · <code>HermesCLI</code></td></tr>
+            <tr><td><code>hermes_cli/main.py</code></td><td>481&nbsp;KB</td><td>argparse · every subcommand handler</td></tr>
+            <tr><td><code>hermes_cli/auth.py</code></td><td>250&nbsp;KB</td><td>OAuth + API-key flows for 20+ providers</td></tr>
+            <tr><td><code>hermes_cli/config.py</code></td><td>235&nbsp;KB</td><td>Config load/save · env bridge · managed-mode detection</td></tr>
+            <tr><td><code>agent/conversation_loop.py</code></td><td>226&nbsp;KB</td><td>The session hot path · <code>run_conversation()</code></td></tr>
+            <tr><td><code>hermes_cli/gateway.py</code></td><td>224&nbsp;KB</td><td>Gateway lifecycle (systemd/launchd/Win service)</td></tr>
+            <tr><td><code>agent/auxiliary_client.py</code></td><td>214&nbsp;KB</td><td>Multi-model parallel calls · credential pool</td></tr>
+            <tr><td><code>hermes_cli/kanban_db.py</code></td><td>199&nbsp;KB</td><td>SQLite Kanban board with FTS5 search</td></tr>
+            <tr><td><code>hermes_cli/web_server.py</code></td><td>172&nbsp;KB</td><td>Embedded web UI HTTP server</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===== §2 ENTRY PIPELINE ===== -->
+      <section id="s2" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">02</span>
+          <h2>The entry pipeline</h2>
+          <span class="in-mod-tag">boot</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Ten steps from a shell typing <code>hermes</code> to the first model call. The unusual move is step 2: profile override mutates <code>HERMES_HOME</code> <i>before</i> any downstream import resolves config paths.</p>
+
+        <p>The pyproject.toml declares <code>hermes = "hermes_cli.main:main"</code>. When the user invokes <code>hermes</code>, Python imports <code>hermes_cli.main</code>, calls <code>main()</code>, and the pipeline below runs.</p>
+
+        <!-- INFOGRAPHIC B — entry pipeline -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 720" role="img" aria-labelledby="figB-title" class="in-svg">
+            <title id="figB-title">CLI entry-point pipeline — 10 steps</title>
+
+            {entrySteps.map((step, i) => (
+              <g>
+                <rect x="30" y={30 + i * 68} width="660" height="48" class="svg-step"/>
+                <text x="50" y={48 + i * 68} class="svg-step-n">{step.n}</text>
+                <text x="100" y={48 + i * 68} class="svg-step-t">{step.title}</text>
+                <text x="100" y={68 + i * 68} class="svg-step-sub">{step.loc}</text>
+                {i < 9 && (
+                  <line x1="60" y1={78 + i * 68} x2="60" y2={98 + i * 68} class="svg-step-line"/>
+                )}
+              </g>
+            ))}
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;2 — entry pipeline. Profile override at step 3 must precede config-touching imports.</figcaption>
+        </figure>
+
+        <p class="in-note"><b>Surprise:</b> <code>cli.py</code> at the repo root (the 647&nbsp;KB <code>HermesCLI</code> class) is <i>not</i> directly exposed as a <code>[project.scripts]</code> entry. It is called <i>through</i> <code>hermes_cli/main.py</code>'s <code>cmd_chat</code>. So there are two parallel CLI codebases — argparse-based command routing in <code>main.py</code>, and the interactive <code>prompt_toolkit</code> session loop in <code>cli.py</code>. Editing the wrong one is a documented community footgun.</p>
+      </section>
+
+      <!-- ===== §3 SESSION LOOP ===== -->
+      <section id="s3" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">03</span>
+          <h2>The session loop</h2>
+          <span class="in-mod-tag">runtime</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> <code>run_conversation()</code> is a <i>bounded</i> while loop — not <code>while True</code> — capped by an <code>IterationBudget</code> (parent default 90, subagents 50). Tool execution runs concurrent via a <code>ThreadPoolExecutor</code> with cap <code>_MAX_TOOL_WORKERS = 8</code>.</p>
+
+        <p>The loop guard reads <code>while (api_call_count &lt; max_iterations and iteration_budget.remaining &gt; 0) or _budget_grace_call</code>. Each iteration: (1) check <code>_interrupt_requested</code>; (2) bump <code>api_call_count</code>; (3) reset per-turn checkpoint dedup; (4) build <code>api_kwargs</code> with messages + system prompt + tools; (5) call the streaming or non-streaming API; (6) parse response and tool calls; (7) sanitize arguments; (8) dispatch tools; (9) append <code>role=tool</code> messages; (10) loop or break.</p>
+
+        <p>The <code>pre_llm_call</code> hook fires before <code>api_kwargs</code> is built; whatever context it returns is injected into the <i>user message</i>, not the system prompt — a deliberate choice to preserve the prompt-cache prefix. The system prompt itself is built once at session start and only rebuilt after a context-compression event.</p>
+
+        <!-- INFOGRAPHIC C — session loop -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 420" role="img" aria-labelledby="figC-title" class="in-svg">
+            <title id="figC-title">Session loop — run_conversation iteration</title>
+
+            <!-- center label -->
+            <circle cx="360" cy="210" r="58" class="svg-loop-center"/>
+            <text x="360" y="200" class="svg-loop-center-t" text-anchor="middle">while</text>
+            <text x="360" y="220" class="svg-loop-center-t2" text-anchor="middle">budget &gt; 0</text>
+            <text x="360" y="240" class="svg-loop-center-sub" text-anchor="middle">max 90 / 50</text>
+
+            <!-- 6 nodes in a ring -->
+            {loopNodes.map((node) => (
+              <g>
+                <rect x={280 + node.dx} y={188 + node.dy} width="160" height="44" class="svg-loop-node"/>
+                <text x={360 + node.dx} y={215 + node.dy} class="svg-loop-node-t" text-anchor="middle">{node.label}</text>
+              </g>
+            ))}
+
+            <!-- arrows ring (clockwise, gold dotted) -->
+            <path d="M 360 70  Q 460 80  540 130"   class="svg-loop-arrow" />
+            <path d="M 540 130 Q 600 200  540 290"  class="svg-loop-arrow" />
+            <path d="M 540 290 Q 460 340  360 350"  class="svg-loop-arrow" />
+            <path d="M 360 350 Q 260 340  180 290"  class="svg-loop-arrow" />
+            <path d="M 180 290 Q 120 200  180 130"  class="svg-loop-arrow" />
+            <path d="M 180 130 Q 260 80   360 70"   class="svg-loop-arrow" />
+
+            <!-- hook callouts -->
+            <g>
+              <rect x="540" y="14" width="170" height="32" class="svg-hook-tag"/>
+              <text x="555" y="34" class="svg-hook-tag-t">pre_llm_call → fires here</text>
+            </g>
+            <g>
+              <rect x="10" y="14" width="170" height="32" class="svg-hook-tag"/>
+              <text x="25" y="34" class="svg-hook-tag-t">on_session_start (1st turn)</text>
+            </g>
+            <g>
+              <rect x="540" y="374" width="170" height="32" class="svg-hook-tag svg-hook-tag-alt"/>
+              <text x="555" y="394" class="svg-hook-tag-t">pre_tool_call → fires</text>
+            </g>
+            <g>
+              <rect x="10" y="374" width="170" height="32" class="svg-hook-tag svg-hook-tag-alt"/>
+              <text x="25" y="394" class="svg-hook-tag-t">post_tool_call → fires</text>
+            </g>
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;3 — session loop. Tool dispatch is concurrent (cap 8 threads). Hook firing points marked.</figcaption>
+        </figure>
+
+        <p class="in-note"><b>Compression as new session, not mutation.</b> When context overflows, Hermes spawns a <i>new</i> session row with <code>parent_session_id</code> pointing back, marks the old session <code>end_reason='compression'</code>, and continues. History traversal goes <i>forward</i> via <code>get_compression_tip()</code>. The compression chain is the source of truth for "long conversations" — not in-place rewriting.</p>
+      </section>
+
+      <!-- ===== §4 HOOK DISPATCH ===== -->
+      <section id="s4" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">04</span>
+          <h2>Hook dispatch — reality</h2>
+          <span class="in-mod-tag">extension</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> There is no event bus. <code>PluginManager._hooks</code> is a plain dict; <code>invoke_hook()</code> iterates the registered callbacks FIFO with per-callback <code>try/except</code>. Shell hooks are subprocess-wrapping closures injected into the same dict by <code>agent/shell_hooks.register_from_config()</code> — so plugin Python callbacks and shell scripts run in one interleaved loop.</p>
+
+        <p>The dispatcher does <i>not</i> short-circuit on a block result. All registered handlers always run; the block decision is read afterwards by <code>get_pre_tool_call_block_message()</code> which scans the result list for the first <code>&#123;"action": "block"&#125;</code>. A crashed shell-hook script can still issue a block via stdout before crashing — non-zero exit codes log a warning but stdout is still parsed.</p>
+
+        <!-- INFOGRAPHIC D — docs vs actual dispatchers -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 360" role="img" aria-labelledby="figD-title" class="in-svg">
+            <title id="figD-title">Hook dispatch — what docs say vs what code does</title>
+
+            <!-- DOCS panel (left) -->
+            <text x="40" y="34" class="svg-col-h">DOCS SAY</text>
+            <text x="40" y="52" class="svg-col-sub">3 separate systems</text>
+
+            {docsHookSystems.map((label, i) => (
+              <g>
+                <rect x="40" y={80 + i * 60} width="220" height="44" class="svg-doc-box"/>
+                <text x="150" y={80 + i * 60 + 27} class="svg-doc-box-t" text-anchor="middle">{label}</text>
+              </g>
+            ))}
+
+            <!-- divider -->
+            <line x1="340" y1="20" x2="340" y2="340" class="svg-divider"/>
+
+            <!-- ACTUAL panel (right) -->
+            <text x="380" y="34" class="svg-col-h svg-col-h-actual">ACTUAL</text>
+            <text x="380" y="52" class="svg-col-sub">2 dispatchers · 1 ambient table</text>
+
+            <!-- Dispatcher 1: PluginManager._hooks -->
+            <rect x="380" y="70"  width="300" height="120" class="svg-actual-box"/>
+            <text x="400" y="94"  class="svg-actual-h">PluginManager._hooks</text>
+            <text x="400" y="114" class="svg-actual-sub">unified · FIFO · try/except per cb · no short-circuit</text>
+            <rect x="400" y="130" width="120" height="44" class="svg-actual-sub-box"/>
+            <text x="460" y="156" class="svg-actual-sub-box-t" text-anchor="middle">plugin cbs</text>
+            <rect x="540" y="130" width="120" height="44" class="svg-actual-sub-box"/>
+            <text x="600" y="156" class="svg-actual-sub-box-t" text-anchor="middle">shell-hook closures</text>
+
+            <!-- Dispatcher 2: Gateway HookRegistry -->
+            <rect x="380" y="210" width="300" height="64" class="svg-actual-box"/>
+            <text x="400" y="234" class="svg-actual-h">gateway/hooks.HookRegistry</text>
+            <text x="400" y="254" class="svg-actual-sub">separate process · emit / emit_collect</text>
+
+            <!-- Ambient table -->
+            <rect x="380" y="290" width="300" height="54" class="svg-actual-box svg-actual-box-dim"/>
+            <text x="400" y="314" class="svg-actual-h-dim">tool_guardrails.py</text>
+            <text x="400" y="332" class="svg-actual-sub">4th blocking layer · state machine · not a hook</text>
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;4 — what looks like three hook systems is one unified <code>PluginManager._hooks</code> dict plus the gateway's separate <code>HookRegistry</code>.</figcaption>
+        </figure>
+
+        <h3 class="in-h3">Shell hook wire protocol</h3>
+        <p>Hermes writes JSON to <code>stdin</code> of the hook command and parses JSON from <code>stdout</code>. The parser accepts both Hermes-native (<code>action</code>) and Claude Code-shaped (<code>decision</code>) block keys — explicit compatibility move. Default timeout 60s, max 300s, configurable per spec.</p>
+
+        <pre class="in-code"><code>{`# stdin Hermes writes:
+{
+  "hook_event_name": "pre_tool_call",
+  "tool_name": "terminal",
+  "tool_input": { "command": "echo hello" },
+  "session_id": "sess_abc123",
+  "cwd": "/home/user/project",
+  "extra": {}
+}
+
+# stdout Hermes accepts (either form):
+{ "decision": "block", "reason": "Forbidden command" }
+{ "action":   "block", "message": "Forbidden command" }
+
+# pre_llm_call context injection:
+{ "context": "Today is Friday" }`}</code></pre>
+
+        <h3 class="in-h3">Allowlist machinery</h3>
+        <p><code>~/.hermes/shell-hooks-allowlist.json</code> stores <code>(event, command)</code> approval pairs. Lookup is pure key-equality: <code>script_mtime_at_approval</code> is recorded but not checked. A modified hook script with a stale allowlist entry is silently accepted. Bypass via <code>--accept-hooks</code> CLI flag, <code>HERMES_ACCEPT_HOOKS=1</code> env, or <code>hooks_auto_accept: true</code> in config.</p>
+      </section>
+
+      <!-- ===== §5 PERSISTENCE ===== -->
+      <section id="s5" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>Persistence — SQLite v11</h2>
+          <span class="in-mod-tag">storage</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> <code>~/.hermes/state.db</code> is at schema version 11. Two main tables (<code>sessions</code> 29 columns, <code>messages</code> 15 columns), a key-value <code>state_meta</code>, a <code>schema_version</code> tracker, plus two FTS5 virtual tables for unicode and CJK substring search. All writes use <code>BEGIN IMMEDIATE</code> with random 20–150ms jitter to avoid SQLite WAL convoy.</p>
+
+        <p>The <code>sessions</code> table is unusually rich for an "open source agent" tool. It tracks per-session cost (estimated AND actual), token breakdown across input / output / cache-read / cache-write / reasoning, billing provider, billing mode, pricing version, handoff state. This is production-grade billing telemetry baked into the open-source schema.</p>
+
+        <!-- INFOGRAPHIC E — schema -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 420" role="img" aria-labelledby="figE-title" class="in-svg">
+            <title id="figE-title">SQLite state.db schema — version 11</title>
+
+            <!-- sessions table -->
+            <rect x="30" y="20" width="320" height="280" class="svg-table"/>
+            <rect x="30" y="20" width="320" height="32"  class="svg-table-h"/>
+            <text x="50" y="42" class="svg-table-h-t">sessions  ·  29 cols</text>
+
+            {sessionsCols.map((col, i) => (
+              <text x="50" y={74 + i * 15} class="svg-table-col">{col}</text>
+            ))}
+
+            <!-- self-loop arrow -->
+            <path d="M 350 175 Q 420 175  420 95  Q 420 60  350 60" class="svg-fk-arrow"/>
+            <text x="430" y="120" class="svg-fk-label">compression chain</text>
+            <text x="430" y="135" class="svg-fk-label-dim">(spawn new row,</text>
+            <text x="430" y="148" class="svg-fk-label-dim">do not mutate)</text>
+
+            <!-- messages table -->
+            <rect x="370" y="200" width="320" height="180" class="svg-table"/>
+            <rect x="370" y="200" width="320" height="32"  class="svg-table-h"/>
+            <text x="390" y="222" class="svg-table-h-t">messages  ·  15 cols</text>
+
+            {messagesCols.map((col, i) => (
+              <text x="390" y={252 + i * 12} class="svg-table-col">{col}</text>
+            ))}
+
+            <!-- FTS virtual tables -->
+            <rect x="370" y="20" width="320" height="120" class="svg-table svg-table-virt"/>
+            <text x="390" y="42" class="svg-table-h-t-virt">virtual / FTS5</text>
+            <text x="390" y="68" class="svg-table-col">messages_fts (unicode61)</text>
+            <text x="390" y="86" class="svg-table-col">messages_fts_trigram (CJK)</text>
+            <text x="390" y="112" class="svg-table-col-dim">→ trigram index reveals real</text>
+            <text x="390" y="126" class="svg-table-col-dim">multilingual user base</text>
+
+            <!-- state_meta + schema_version -->
+            <rect x="30" y="320" width="160" height="60" class="svg-table svg-table-small"/>
+            <text x="50" y="342" class="svg-table-h-t">state_meta</text>
+            <text x="50" y="362" class="svg-table-col">key (PK), value</text>
+
+            <rect x="200" y="320" width="160" height="60" class="svg-table svg-table-small"/>
+            <text x="220" y="342" class="svg-table-h-t">schema_version</text>
+            <text x="220" y="362" class="svg-table-col">→ migrations · v11</text>
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;5 — state.db schema. Cost telemetry first-class. <code>parent_session_id</code> self-FK as compression chain. FTS5 trigram for CJK.</figcaption>
+        </figure>
+      </section>
+
+      <!-- ===== §6 GATEWAY ===== -->
+      <section id="s6" class="in-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">06</span>
+          <h2>Gateway message pipeline</h2>
+          <span class="in-mod-tag">messaging</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A Slack / Telegram / Teams / WhatsApp message arrives, gets normalized to a <code>MessageEvent</code> dataclass, runs through a <code>SessionStore</code>, fires through <code>HookRegistry</code> (the gateway's own bus, distinct from <code>PluginManager._hooks</code>), reaches an LRU-cached <code>AIAgent</code> instance, streams back via <code>GatewayStreamConsumer</code>, and ends in <code>DeliveryRouter</code>.</p>
+
+        <p>The <code>merge_pending_message_event()</code> step coalesces rapid-fire messages (photo bursts, multi-line splits) into a single agent turn — keeps the LLM call count down on chatty users. The <code>register_post_delivery_callback()</code> mechanism lets background work (review, bubble cleanup) defer until after the user has seen the response, masking latency.</p>
+
+        <!-- INFOGRAPHIC F — gateway pipeline -->
+        <figure class="in-fig">
+          <svg viewBox="0 0 720 560" role="img" aria-labelledby="figF-title" class="in-svg">
+            <title id="figF-title">Gateway message pipeline — 10 steps</title>
+
+            {gatewaySteps.map((step, i) => (
+              <g>
+                <rect x="30" y={20 + i * 52} width="660" height="40" class="svg-step svg-step-gw"/>
+                <text x="50" y={37 + i * 52} class="svg-step-n">{step.n}</text>
+                <text x="100" y={37 + i * 52} class="svg-step-t">{step.title}</text>
+                <text x="100" y={53 + i * 52} class="svg-step-sub">{step.src}</text>
+                {i < 9 && (
+                  <line x1="60" y1={60 + i * 52} x2="60" y2={72 + i * 52} class="svg-step-line svg-step-line-gw"/>
+                )}
+              </g>
+            ))}
+          </svg>
+          <figcaption class="in-figcap">FIG&nbsp;6 — gateway pipeline. AIAgent is LRU-cached per session key; one Hermes process handles many concurrent conversations.</figcaption>
+        </figure>
+      </section>
+
+      <!-- WRAP -->
+      <section class="in-wrap">
+        <h2 class="in-h">▸ TAKE-AWAYS</h2>
+        <ul class="in-wrap-list">
+          <li><b>The architecture is more pragmatic than principled.</b> Two parallel CLI codebases, flat-root Python files, an embedded Kanban board — what shipped early stayed, and accretion is the unifying force.</li>
+          <li><b>The hook surface is simpler than it looks.</b> One dispatcher (<code>PluginManager._hooks</code>) does most of the work; the "3 systems" framing exists because the registration <i>paths</i> are different even though the runtime is unified.</li>
+          <li><b>The session is the unit of accounting, not the conversation.</b> Cost, tokens, billing mode are session-level. Compression spawns new sessions linked by <code>parent_session_id</code> — the chain is the conversation.</li>
+          <li><b>The CJK trigram index is the leak.</b> Hermes's open-source codebase quietly exposes the size of its WeChat / Feishu / DingTalk user base — multilingual substring search is not an idle decision.</li>
+          <li><b>The docs lag the code.</b> <code>pre_gateway_dispatch</code>, "6 categories", and "3 concurrent subagents" are wrong or unconfirmable. Read source for anything load-bearing.</li>
+        </ul>
+        <p class="in-wrap-foot">
+          Source-grounded against <a href="https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16" rel="noopener">NousResearch/hermes-agent@v2026.5.16</a>. Methodology: three parallel reverse-engineering passes via raw GitHub file fetches; every claim cites a file path. Cycle this page against a newer tag when v0.15 lands.
+        </p>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · INTERNALS · MIT · {new Date().getFullYear()} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .in-page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .in-banner {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .in-banner .hc-subtag {
+        margin-top: 1rem;
+        max-width: 42rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .ix-inline-link {
+        color: var(--color-amber);
+        border-bottom: 1px dotted var(--color-amber);
+      }
+
+      .in-h {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.18em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+        margin: 0 0 1rem;
+      }
+
+      .in-corrections {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 4px solid var(--color-error);
+        padding: 1.25rem 1.5rem 1rem;
+        margin-bottom: 2.5rem;
+      }
+      .in-corrections .in-h {
+        color: var(--color-error);
+      }
+      .in-corr-intro {
+        font-size: 0.93rem;
+        color: var(--color-fg);
+        margin: 0 0 1rem;
+        line-height: 1.6;
+      }
+      .in-corr-list {
+        margin: 0;
+        padding-left: 1.4rem;
+        color: var(--color-fg);
+      }
+      .in-corr-list li {
+        margin-bottom: 0.85rem;
+        line-height: 1.65;
+        font-size: 0.92rem;
+      }
+      .in-corr-list code {
+        background: var(--color-surface-mid);
+        color: var(--color-amber);
+        padding: 0.05rem 0.3rem;
+        font-size: 0.85em;
+      }
+      .in-corr-list b {
+        color: var(--color-gold);
+      }
+      .in-corr-list i {
+        color: var(--color-fg-dim);
+      }
+
+      .in-toc {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 3rem;
+      }
+      .in-toc-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.4rem;
+      }
+      .in-toc-list a {
+        display: flex;
+        align-items: baseline;
+        gap: 0.85rem;
+        padding: 0.45rem 0.6rem;
+        border-left: 2px solid transparent;
+        font-size: 0.92rem;
+      }
+      .in-toc-list a:hover {
+        background: var(--color-surface-mid);
+        border-left-color: var(--color-gold);
+      }
+      .in-toc-n {
+        font-family: var(--font-mono);
+        color: var(--color-fg-dim);
+        font-size: 0.78rem;
+        min-width: 1.5rem;
+      }
+      .in-toc-title {
+        font-family: var(--font-display);
+        color: var(--color-fg);
+        flex: 1;
+      }
+      .in-toc-tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--color-bronze);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .in-mod {
+        margin-bottom: 4rem;
+      }
+      .in-mod-h {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding-bottom: 0.6rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--color-bronze);
+      }
+      .in-mod-h h2 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.7rem;
+        color: var(--color-gold);
+        margin: 0;
+        flex: 1;
+      }
+      .in-mod-n {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        color: var(--color-bronze);
+        background: var(--color-surface);
+        padding: 0.2rem 0.55rem;
+        border: 1px solid var(--color-bronze);
+      }
+      .in-mod-tag {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .in-mod p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 1rem;
+        font-size: 0.97rem;
+      }
+      .in-mod p code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.86em;
+      }
+      .in-mod p b { color: var(--color-gold); }
+      .in-mod p i { color: var(--color-fg-dim); }
+
+      .in-tldr {
+        background: var(--color-surface);
+        border-left: 3px solid var(--color-gold);
+        padding: 0.85rem 1rem;
+        font-size: 0.95rem !important;
+      }
+
+      .in-h3 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.15rem;
+        color: var(--color-amber);
+        margin: 1.75rem 0 0.6rem;
+      }
+
+      .in-note {
+        background: var(--color-surface);
+        border-left: 3px solid var(--color-amber);
+        padding: 0.85rem 1rem;
+        font-size: 0.92rem !important;
+        margin: 1.25rem 0 !important;
+      }
+      .in-note b { color: var(--color-amber); }
+      .in-note-dim {
+        font-size: 0.85rem !important;
+        color: var(--color-fg-dim) !important;
+        font-style: italic;
+        margin: 0 0 0.5rem !important;
+      }
+
+      .in-code {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--color-fg);
+        overflow-x: auto;
+        line-height: 1.55;
+        margin: 0.4rem 0 1rem;
+      }
+      .in-code code {
+        background: transparent;
+        padding: 0;
+        color: inherit;
+      }
+
+      .in-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin: 0.5rem 0 1.25rem;
+      }
+      .in-table th {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-bronze);
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid var(--color-bronze);
+        white-space: nowrap;
+      }
+      .in-table td {
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid var(--color-surface-hi);
+        color: var(--color-fg);
+        vertical-align: top;
+      }
+      .in-table td:first-child code {
+        color: var(--color-amber);
+      }
+      .in-table td:nth-child(2) {
+        color: var(--color-gold);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+
+      /* ===== SVG INFOGRAPHIC STYLES ===== */
+      .in-fig {
+        margin: 1.5rem 0 1.75rem;
+      }
+      .in-svg {
+        width: 100%;
+        height: auto;
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 0.5rem;
+        display: block;
+      }
+      .in-figcap {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--color-fg-dim);
+        margin-top: 0.5rem;
+        letter-spacing: 0.04em;
+        text-align: center;
+      }
+      .in-figcap code {
+        color: var(--color-amber);
+        font-size: 0.9em;
+      }
+
+      /* Plane diagram (Fig 1) */
+      .svg-plane {
+        fill: var(--color-bg);
+        stroke: var(--color-bronze);
+        stroke-width: 1;
+      }
+      .svg-plane-c { stroke: var(--color-teal); }
+      .svg-plane-b { stroke: var(--color-gold); }
+      .svg-plane-a { stroke: var(--color-amber); }
+      .svg-plane-cross { stroke: var(--color-bronze); fill: var(--color-surface-mid); }
+      .svg-plane-label {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        fill: var(--color-gold);
+      }
+      .svg-plane-c + .svg-plane-label, .svg-plane-c ~ .svg-plane-label { fill: var(--color-teal); }
+      .svg-plane-sub {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        fill: var(--color-fg);
+      }
+      .svg-plane-files {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--color-amber);
+      }
+      .svg-plane-files-dim {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-plane-cross-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--color-bronze);
+        letter-spacing: 0.06em;
+      }
+
+      /* Pipeline diagram (Fig 2, 6) */
+      .svg-step {
+        fill: var(--color-bg);
+        stroke: var(--color-bronze);
+        stroke-width: 1;
+      }
+      .svg-step-gw {
+        stroke: var(--color-amber);
+      }
+      .svg-step-n {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        fill: var(--color-bronze);
+      }
+      .svg-step-t {
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 700;
+        fill: var(--color-gold);
+      }
+      .svg-step-sub {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-step-line {
+        stroke: var(--color-bronze);
+        stroke-width: 2;
+        stroke-dasharray: 3 3;
+      }
+      .svg-step-line-gw {
+        stroke: var(--color-amber);
+      }
+
+      /* Loop diagram (Fig 3) */
+      .svg-loop-center {
+        fill: var(--color-surface-mid);
+        stroke: var(--color-gold);
+        stroke-width: 2;
+      }
+      .svg-loop-center-t {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 900;
+        fill: var(--color-gold);
+      }
+      .svg-loop-center-t2 {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 700;
+        fill: var(--color-amber);
+      }
+      .svg-loop-center-sub {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-loop-node {
+        fill: var(--color-bg);
+        stroke: var(--color-bronze);
+      }
+      .svg-loop-node-t {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--color-fg);
+        font-weight: 600;
+      }
+      .svg-loop-arrow {
+        fill: none;
+        stroke: var(--color-gold);
+        stroke-width: 1.5;
+        stroke-dasharray: 2 4;
+      }
+      .svg-hook-tag {
+        fill: var(--color-bg);
+        stroke: var(--color-amber);
+      }
+      .svg-hook-tag-alt {
+        stroke: var(--color-teal);
+      }
+      .svg-hook-tag-t {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        fill: var(--color-amber);
+      }
+      .svg-hook-tag-alt + .svg-hook-tag-t, .svg-hook-tag-alt ~ .svg-hook-tag-t { fill: var(--color-teal); }
+
+      /* Two-column diagram (Fig 4) */
+      .svg-col-h {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 700;
+        fill: var(--color-bronze);
+        letter-spacing: 0.1em;
+      }
+      .svg-col-h-actual { fill: var(--color-gold); }
+      .svg-col-sub {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-doc-box {
+        fill: var(--color-bg);
+        stroke: var(--color-bronze);
+        stroke-dasharray: 2 3;
+      }
+      .svg-doc-box-t {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-divider {
+        stroke: var(--color-bronze);
+        stroke-width: 1;
+        stroke-dasharray: 1 4;
+      }
+      .svg-actual-box {
+        fill: var(--color-bg);
+        stroke: var(--color-gold);
+      }
+      .svg-actual-box-dim {
+        stroke: var(--color-bronze);
+      }
+      .svg-actual-h {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        fill: var(--color-gold);
+      }
+      .svg-actual-h-dim {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        fill: var(--color-bronze);
+      }
+      .svg-actual-sub {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        fill: var(--color-fg-dim);
+      }
+      .svg-actual-sub-box {
+        fill: var(--color-surface-mid);
+        stroke: var(--color-amber);
+      }
+      .svg-actual-sub-box-t {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--color-amber);
+      }
+
+      /* Schema diagram (Fig 5) */
+      .svg-table {
+        fill: var(--color-bg);
+        stroke: var(--color-bronze);
+      }
+      .svg-table-small { fill: var(--color-surface-mid); }
+      .svg-table-virt { stroke: var(--color-teal); }
+      .svg-table-h {
+        fill: var(--color-surface);
+        stroke: var(--color-bronze);
+      }
+      .svg-table-h-t {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        fill: var(--color-gold);
+      }
+      .svg-table-h-t-virt {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 700;
+        fill: var(--color-teal);
+      }
+      .svg-table-col {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        fill: var(--color-fg);
+      }
+      .svg-table-col-dim {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        fill: var(--color-fg-dim);
+        font-style: italic;
+      }
+      .svg-fk-arrow {
+        fill: none;
+        stroke: var(--color-amber);
+        stroke-width: 1.5;
+      }
+      .svg-fk-label {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        fill: var(--color-amber);
+        font-weight: 700;
+      }
+      .svg-fk-label-dim {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        fill: var(--color-fg-dim);
+      }
+
+      /* Wrap-up section */
+      .in-wrap {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 4px solid var(--color-gold);
+        padding: 1.5rem 1.65rem 1.25rem;
+        margin-top: 2rem;
+        margin-bottom: 2.5rem;
+      }
+      .in-wrap-list {
+        margin: 0 0 1.25rem;
+        padding-left: 1.4rem;
+        line-height: 1.65;
+      }
+      .in-wrap-list li {
+        margin-bottom: 0.6rem;
+        font-size: 0.93rem;
+        color: var(--color-fg);
+      }
+      .in-wrap-list code {
+        background: var(--color-bg);
+        color: var(--color-amber);
+        padding: 0.05rem 0.3rem;
+        font-size: 0.85em;
+      }
+      .in-wrap-list b { color: var(--color-gold); }
+      .in-wrap-foot {
+        font-size: 0.85rem;
+        color: var(--color-fg-dim);
+        font-style: italic;
+        line-height: 1.6;
+        margin: 0;
+      }
+      .in-wrap-foot a {
+        color: var(--color-amber);
+        border-bottom: 1px dotted var(--color-amber);
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #f7f7f5;
+          --color-surface-mid: #efefea;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .in-svg { background: #ffffff; }
+        .in-mod { break-inside: avoid; }
+        .in-fig { break-inside: avoid; }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
+  </body>
+</html>

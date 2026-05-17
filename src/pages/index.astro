@@ -51,12 +51,12 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           A reference companion for <a href="https://github.com/NousResearch/hermes-agent" class="ix-inline-link">Hermes Agent</a> by NousResearch.
         </p>
         <p class="ix-subtag">
-          Three free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
+          Four free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
         </p>
       </section>
 
       <section class="ix-strip-banner">
-        <span>▮ THREE FREE SURFACES — CHEATSHEET · MASTER CLASS · FOUNDATION RELEASE ▮</span>
+        <span>▮ FOUR FREE SURFACES — CHEATSHEET · MASTER CLASS · FOUNDATION · INTERNALS ▮</span>
       </section>
 
       <section class="ix-grid" aria-label="Learning surfaces">
@@ -99,6 +99,20 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           </p>
           <div class="ix-card-meta">
             <span>808 commits</span><span>·</span><span>633 PRs</span><span>·</span><span>215 contributors</span>
+          </div>
+        </a>
+
+        <a href={`${base}/internals/`} class="ix-card ix-card-teal">
+          <div class="ix-card-h">
+            <span class="ix-card-n">04</span>
+            <span class="ix-card-title">Internals</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            Reverse-engineered tour of the actual source. Three architectural planes, the entry pipeline, hook dispatch reality, SQLite v11 schema, gateway pipeline. <b>Read the code, not the docs.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>6 sections</span><span>·</span><span>6 SVG infographics</span><span>·</span><span>source-grounded</span>
           </div>
         </a>
       </section>
@@ -279,6 +293,7 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
       .ix-card-gold   { --ix-c: var(--color-gold); }
       .ix-card-amber  { --ix-c: var(--color-amber); }
       .ix-card-bronze { --ix-c: var(--color-bronze); }
+      .ix-card-teal   { --ix-c: var(--color-teal); }
 
       .ix-card-h {
         display: flex;
