@@ -272,6 +272,43 @@
   fill: var(--color-fg);
 }
 
+/* ===== SHARED CODE BLOCK + LIST PRIMITIVES (every page) ===== */
+.ht-code {
+  background: var(--color-bg);
+  border: 1px solid var(--color-bronze);
+  padding: 0.85rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-fg);
+  overflow-x: auto;
+  line-height: 1.55;
+  margin: 0.4rem 0 1rem;
+}
+.ht-code code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.ht-list {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.4rem;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.ht-list li {
+  margin-bottom: 0.55rem;
+  color: var(--color-fg);
+}
+.ht-list code {
+  background: var(--color-surface-mid);
+  color: var(--color-amber);
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+}
+.ht-list b {
+  color: var(--color-gold);
+}
+
 /* ===== SHARED MODULE / TLDR / NOTE PRIMITIVES (both internals + how-to) ===== */
 .in-h {
   font-family: var(--font-mono);
