@@ -1,0 +1,659 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Skill Authoring · v${HERMES_VERSION}`;
+const pageDesc = `Author skills + plugins for Hermes Agent. SKILL.md frontmatter schema, ctx.register_* API, the 5 plugin kinds, curator daemon, and the agentskills.io 3-tier portability framework — same SKILL.md running across 40+ runtimes (Hermes · Claude Code · Codex · Cursor · Goose · Cline · …).`;
+
+const sections = [
+  { n: 1, slug: "two-layers",  title: "Two layers: SKILL.md vs Plugin",   tag: "concepts"    },
+  { n: 2, slug: "frontmatter", title: "SKILL.md frontmatter schema",      tag: "schema"      },
+  { n: 3, slug: "ctx",         title: "The ctx API surface",              tag: "api"         },
+  { n: 4, slug: "kinds",       title: "The 5 plugin kinds",               tag: "registration"},
+  { n: 5, slug: "discovery",   title: "Discovery order (4-tier)",         tag: "loading"     },
+  { n: 6, slug: "example",     title: "Worked example: pin-issue",        tag: "tutorial"    },
+  { n: 7, slug: "curator",     title: "The curator daemon",               tag: "automation"  },
+  { n: 8, slug: "portability", title: "Cross-runtime portability (3-tier)", tag: "ecosystem" },
+  { n: 9, slug: "publish",     title: "Publishing &amp; distribution",         tag: "registries"  },
+];
+
+const ctxApi = [
+  { method: "register_tool(name, toolset, schema, handler, …)",          use: "Add an LLM-callable tool" },
+  { method: "register_hook(hook_name, callback)",                         use: "Tap into session lifecycle events" },
+  { method: "register_command(name, handler, description, args_hint)",    use: "Add an in-session /slash command" },
+  { method: "register_cli_command(name, help, setup_fn, handler_fn, …)",  use: "Add a hermes <name> CLI subcommand" },
+  { method: "dispatch_tool(tool_name, args_dict) → str",                  use: "Call another registered tool from code" },
+  { method: "inject_message(text)",                                       use: "Push a synthetic message into the session" },
+  { method: "register_skill(name, path, description='')",                 use: "Bundle a SKILL.md as plugin:name" },
+  { method: "register_platform(name, label, adapter_factory, …)",         use: "Add a messaging gateway (Discord/TG/Slack/…)" },
+  { method: "register_memory_provider(provider_instance)",                use: "Register a custom memory backend (exclusive)" },
+  { method: "register_context_engine(engine_instance)",                   use: "Register a context/retrieval engine (single slot)" },
+  { method: "register_image_gen_provider(provider_instance)",             use: "Add an image generation backend" },
+  { method: "register_video_gen_provider(provider_instance)",             use: "Add a video generation backend" },
+  { method: "register_web_search_provider(provider_instance)",            use: "Add a web search backend" },
+  { method: "register_browser_provider(provider_instance)",               use: "Add a browser automation backend" },
+  { method: "llm  (property)",                                            use: "Access the active LLM client from code" },
+  { method: "manifest  (attribute)",                                      use: "Read this plugin's own parsed plugin.yaml" },
+];
+
+const kinds = [
+  { kind: "standalone",     def: "Yes (fallback)", auto: "No — config-gated", use: "Tools, hooks, slash commands; general-purpose extension", detect: "Default" },
+  { kind: "backend",        def: "No",              auto: "Yes (bundled); config-gated (user)", use: "Pluggable provider for an existing tool category (image gen, video gen)", detect: "—" },
+  { kind: "exclusive",      def: "No",              auto: "Config-selected (single slot)", use: "Replacement memory or context engine — only one active at a time", detect: "register_memory_provider or MemoryProvider in first 8KB of __init__.py" },
+  { kind: "platform",       def: "No",              auto: "Yes (bundled); config-gated (user)", use: "Messaging gateway adapter (Discord, Telegram, Slack, …)", detect: "—" },
+  { kind: "model-provider", def: "No",              auto: "Via providers discovery", use: "New LLM backend", detect: "register_provider AND ProviderProfile in first 8KB of __init__.py" },
+];
+
+const discovery = [
+  { tier: "1. Bundled",       path: "<hermes-package>/plugins/",         note: "Ships with Hermes. Excludes memory/context_engine/platforms/model-providers from user override." },
+  { tier: "2. User",          path: "~/.hermes/plugins/<name>/",         note: "Always active; primary author target." },
+  { tier: "3. Project",       path: "./.hermes/plugins/<name>/",         note: "Opt-in: HERMES_ENABLE_PROJECT_PLUGINS=1; scoped to working directory." },
+  { tier: "4. Pip entry-point", path: "package exposes hermes_agent.plugins group", note: "pip install hermes-plugin-*; installed globally." },
+];
+
+const portability = [
+  { tier: "cc-native",            key: "cc-native",            covers: "Claude Code, Claude.ai",        constraint: "References .claude/ paths, $CLAUDE_SKILL_DIR, CC-only tools (TaskCreate, Skill recursion)" },
+  { tier: "agentskills-portable", key: "agentskills-portable", covers: "40+ runtimes including Hermes Agent, OpenAI Codex, Cursor, Goose, OpenCode, Gemini CLI, Junie, GitHub Copilot, VS Code, Amp, OpenHands, Letta, Roo Code, Kiro, …", constraint: "No .claude/ paths; no CC-specific tools; state in skill-relative paths or documented env vars" },
+  { tier: "runtime-agnostic",     key: "runtime-agnostic",     covers: "All of the above + Windows-only environments",     constraint: "All scripts have Windows parallel OR logic in portable language (Python/JS); file paths handled portably" },
+];
+
+const distribution = [
+  { method: "Tap",              cmd: "hermes skills tap add owner/repo",                                       note: "Recommended for teams — GitHub repo of SKILL.md folders. No server required." },
+  { method: "Hub install",      cmd: "hermes skills install owner/repo/skills/my-skill",                       note: "Single skill from any public GitHub repo without a tap." },
+  { method: "skills.sh",        cmd: "hermes skills install skills-sh/vercel-labs/json-render/json-render-react", note: "Via the skills.sh directory proxy." },
+  { method: "Well-known",       cmd: "hermes skills install well-known:https://example.com/.well-known/skills/mintlify", note: "Vendor-hosted." },
+  { method: "Direct URL",       cmd: "hermes skills install https://sharethis.chat/SKILL.md",                  note: "Single-file install from any HTTPS URL." },
+  { method: "HuggingFace",      cmd: "hermes skills install hf:owner/skill",                                   note: "Community skills published to huggingface.co/skills." },
+  { method: "Publish to GH",    cmd: "hermes skills publish skills/my-skill --to github --repo owner/repo",    note: "Push skill folder to a repo." },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/skills/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="skills" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="sk-page">
+      <section class="sk-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · SKILL AUTHORING</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>AGENTSKILLS.IO ECOSYSTEM ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">WRITE ONCE</span>
+          <span class="hc-title-line hc-title-accent">RUN EVERYWHERE</span>
+        </h1>
+        <p class="hc-tag">SKILL.MD · CTX API · 5 KINDS · CURATOR · PORTABILITY</p>
+        <p class="hc-subtag">
+          From a 20-line <code>SKILL.md</code> to a full plugin with hooks, tools, and CLI subcommands. Plus the <b>agentskills.io</b> portability story — the same skill running unchanged across Hermes Agent, Claude Code, OpenAI Codex, Cursor, Goose, Cline, and ~35 other runtimes.
+        </p>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          {sections.map((s) => (
+            <li>
+              <a href={`#s${s.n}`}>
+                <span class="in-toc-n">{String(s.n).padStart(2, "0")}</span>
+                <span class="in-toc-title" set:html={s.title}></span>
+                <span class="in-toc-tag">{s.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §1 TWO LAYERS ===== -->
+      <section id="s1" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">01</span>
+          <h2>Two layers: SKILL.md vs Plugin</h2>
+          <span class="in-mod-tag">concepts</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A <code>SKILL.md</code> is a folder with a single markdown file — declarative recipe, no Python. A <b>plugin</b> is <code>plugin.yaml</code> + <code>__init__.py</code> with a <code>register(ctx)</code> function — extends the Hermes runtime. Plugins MAY bundle skills via <code>ctx.register_skill()</code>. For knowledge-only workflows, <code>SKILL.md</code> alone is always enough.</p>
+
+        <div class="sk-grid-2">
+          <article class="sk-card sk-card-gold">
+            <h3>SKILL.md</h3>
+            <p class="sk-card-tag">declarative recipe</p>
+            <p>Folder under <code>~/.hermes/skills/&lt;name&gt;/SKILL.md</code>. Auto-discovered. Becomes a slash command. Agent reads progressively — name + description at startup, full body on activation. No Python.</p>
+            <p class="sk-good"><b>Use for</b> procedural recipes, team SOPs, domain knowledge capsules.</p>
+          </article>
+          <article class="sk-card sk-card-amber">
+            <h3>Plugin</h3>
+            <p class="sk-card-tag">registration code</p>
+            <p>Folder under <code>~/.hermes/plugins/&lt;name&gt;/</code> with <code>plugin.yaml</code> manifest + <code>__init__.py</code> exporting <code>register(ctx)</code>. Adds runtime behavior — tools, hooks, CLI subcommands, providers.</p>
+            <p class="sk-good"><b>Use for</b> new tools the LLM can call, lifecycle hooks, custom messaging adapters, alternative memory/context engines.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ===== §2 FRONTMATTER SCHEMA ===== -->
+      <section id="s2" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">02</span>
+          <h2>SKILL.md frontmatter schema</h2>
+          <span class="in-mod-tag">schema</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> 6 fields from the <code>agentskills.io</code> spec are honored by Hermes. Hermes-specific extensions live under <code>metadata.hermes.*</code> and <code>required_environment_variables</code>/<code>platforms</code> — silently ignored by other runtimes, so safe to include in any portability tier.</p>
+
+        <pre class="ht-code"><code>{`---
+# REQUIRED
+name: pin-issue           # 1-64 chars, lowercase + hyphens, matches dir name
+description: |            # 1-1024 chars; keywords + when-to-use
+  Save a GitHub issue URL as a pinned memory. Use when the user says
+  "pin this issue", "remember this ticket", or shares an issue link.
+
+# OPTIONAL (agentskills.io spec)
+license: MIT
+compatibility: Compatible with any agentskills.io-compatible runtime.
+allowed-tools: Bash(gh:*) Read Write   # experimental; space-separated
+
+metadata:
+  author: yourorg
+  version: "1.0"
+  # Cross-runtime portability tier (kebab-namespaced per harness convention)
+  agent0-portability-tier: agentskills-portable
+
+  # HERMES EXTENSIONS — ignored by other runtimes, safe to include
+  hermes:
+    tags: [memory, github, productivity]
+    category: productivity
+    fallback_for_toolsets: [web]      # hide when premium toolset active
+    requires_toolsets: [terminal]     # hide when terminal unavailable
+    fallback_for_tools: [web_search]
+    requires_tools: [terminal]
+    config:
+      - key: myplugin.path
+        description: Path to plugin data directory
+        default: "~/myplugin-data"
+        prompt: Plugin data directory path
+
+# HERMES-ONLY top-level — secret declarations
+required_environment_variables:
+  - name: GITHUB_TOKEN
+    prompt: Personal access token
+    help: https://github.com/settings/tokens
+    required_for: issue pinning
+
+# HERMES-ONLY — restrict to OS
+platforms: [macos, linux]
+---`}</code></pre>
+      </section>
+
+      <!-- ===== §3 CTX API ===== -->
+      <section id="s3" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">03</span>
+          <h2>The <code>ctx</code> API surface</h2>
+          <span class="in-mod-tag">api</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> 14 register-shape methods + 2 dispatch methods + 2 attributes. Group by domain: <b>tools / hooks / commands</b> (most common) · <b>providers</b> (memory, context engine, image/video gen, web search, browser, platform) · <b>introspection</b> (<code>llm</code>, <code>manifest</code>).</p>
+
+        <table class="in-table">
+          <thead><tr><th>Method / Property</th><th>Use case</th></tr></thead>
+          <tbody>
+            {ctxApi.map((api) => (
+              <tr>
+                <td><code class="sk-method">{api.method}</code></td>
+                <td>{api.use}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p class="in-note"><b>Hook callback contract.</b> Hooks registered via <code>ctx.register_hook(name, callback)</code> must accept <code>**kwargs</code> and must NOT raise — exceptions get caught and logged but break nothing. Hook names available: <code>pre_tool_call</code>, <code>post_tool_call</code>, <code>pre_llm_call</code> (can return context dict), <code>post_llm_call</code>, <code>on_session_start</code>, <code>on_session_end</code>, <code>on_session_finalize</code>, <code>on_session_reset</code>.</p>
+      </section>
+
+      <!-- ===== §4 KINDS ===== -->
+      <section id="s4" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">04</span>
+          <h2>The 5 plugin kinds</h2>
+          <span class="in-mod-tag">registration</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Declare <code>kind:</code> in <code>plugin.yaml</code>. Two kinds (<code>exclusive</code>, <code>model-provider</code>) <i>auto-detect</i> from <code>__init__.py</code> imports — Hermes scans the first 8 KB. Declare explicitly to suppress auto-detection.</p>
+
+        <table class="in-table">
+          <thead>
+            <tr><th>kind</th><th>Default?</th><th>Auto-loads?</th><th>Use for</th><th>Auto-detect when</th></tr>
+          </thead>
+          <tbody>
+            {kinds.map((k) => (
+              <tr>
+                <td><code>{k.kind}</code></td>
+                <td>{k.def}</td>
+                <td>{k.auto}</td>
+                <td>{k.use}</td>
+                <td>{k.detect}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ===== §5 DISCOVERY ===== -->
+      <section id="s5" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>Discovery order (4-tier)</h2>
+          <span class="in-mod-tag">loading</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Four tiers, later tiers override earlier ones on key collision. Alphabetical within a tier. Debug with <code>HERMES_PLUGINS_DEBUG=1 hermes plugins list</code> — prints scan paths, skip reasons, import errors.</p>
+
+        <table class="in-table">
+          <thead><tr><th>Tier</th><th>Path</th><th>Notes</th></tr></thead>
+          <tbody>
+            {discovery.map((d) => (
+              <tr>
+                <td><b>{d.tier}</b></td>
+                <td><code>{d.path}</code></td>
+                <td>{d.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p class="in-note-dim">Nested category layout supported (one level max): <code>~/.hermes/plugins/&lt;category&gt;/&lt;plugin&gt;/plugin.yaml</code> — the discovered key becomes <code>category/plugin</code>.</p>
+      </section>
+
+      <!-- ===== §6 WORKED EXAMPLE ===== -->
+      <section id="s6" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">06</span>
+          <h2>Worked example: <code>pin-issue</code></h2>
+          <span class="in-mod-tag">tutorial</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> A skill that pins a GitHub issue URL to a markdown file. Shown twice: <b>standalone SKILL.md</b> (no Python, knowledge-only) and <b>plugin variant</b> (adds a <code>/pin</code> slash command).</p>
+
+        <h3 class="in-h3">Standalone (no plugin)</h3>
+        <p>File path: <code>~/.hermes/skills/pin-issue/SKILL.md</code></p>
+        <pre class="ht-code"><code>{`---
+name: pin-issue
+description: |
+  Save a GitHub issue URL as a pinned memory for future recall.
+  Use when the user says "pin this issue", "remember this ticket",
+  or pastes an issue URL.
+license: MIT
+compatibility: Compatible with any agentskills.io-compatible runtime with file IO and shell access.
+metadata:
+  author: yourorg
+  version: "1.0"
+  agent0-portability-tier: agentskills-portable
+---
+
+## When to use
+The user shares a GitHub issue URL and wants it saved for later recall.
+
+## Procedure
+1. Extract the issue URL from the user message.
+2. Run \`gh issue view <URL> --json title,number,url\` to fetch metadata.
+3. Append to \`~/.hermes/pinned-issues.md\`:
+   \`- [#NUMBER: TITLE](URL) — pinned YYYY-MM-DD\`
+4. Confirm: "Pinned issue #NUMBER: TITLE."
+
+## Pitfalls
+- \`gh\` must be authenticated. If not, prompt the user to run \`gh auth login\`.
+- Duplicate pins: check \`~/.hermes/pinned-issues.md\` before appending.`}</code></pre>
+
+        <h3 class="in-h3">Plugin variant — adds <code>/pin</code> slash command</h3>
+        <p>Files: <code>~/.hermes/plugins/pin-issue/plugin.yaml</code> + <code>__init__.py</code></p>
+
+        <p><code>plugin.yaml</code>:</p>
+        <pre class="ht-code"><code>{`name: pin-issue
+version: "1.0.0"
+description: Saves GitHub issue URLs as pinned memories and provides /pin slash command.
+kind: standalone
+provides_tools: []
+provides_hooks: []
+requires_env:
+  - name: GITHUB_TOKEN
+    description: "GitHub personal access token"
+    url: "https://github.com/settings/tokens"
+    secret: true`}</code></pre>
+
+        <p><code>__init__.py</code>:</p>
+        <pre class="ht-code"><code>{`import json
+import subprocess
+from pathlib import Path
+from datetime import date
+
+PINS_FILE = Path.home() / ".hermes" / "pinned-issues.md"
+
+def _pin(url: str) -> str:
+    try:
+        raw = subprocess.check_output(
+            ["gh", "issue", "view", url, "--json", "title,number,url"],
+            text=True,
+        )
+        data = json.loads(raw)
+        entry = f"- [#{data['number']}: {data['title']}]({data['url']}) "
+        entry += f"— pinned {date.today()}\\n"
+        PINS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        content = PINS_FILE.read_text() if PINS_FILE.exists() else ""
+        if data["url"] in content:
+            return json.dumps({"status": "already pinned", "url": data["url"]})
+        PINS_FILE.write_text(content + entry)
+        return json.dumps({"status": "pinned", "number": data["number"]})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+def _slash_pin(args: str, **kwargs):
+    url = args.strip()
+    if not url:
+        return "Usage: /pin <github-issue-url>"
+    result = json.loads(_pin(url))
+    if "error" in result:
+        return f"Error: {result['error']}"
+    return f"Pinned issue #{result.get('number')}"
+
+def register(ctx):
+    ctx.register_skill("pin-issue", str(Path(__file__).parent / "SKILL.md"))
+    ctx.register_command(
+        name="pin",
+        handler=_slash_pin,
+        description="Pin a GitHub issue URL to memory",
+        args_hint="<github-issue-url>",
+    )`}</code></pre>
+
+        <p>Enable: <code>hermes plugins enable pin-issue</code>, then verify with <code>HERMES_PLUGINS_DEBUG=1 hermes plugins list</code>.</p>
+      </section>
+
+      <!-- ===== §7 CURATOR ===== -->
+      <section id="s7" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">07</span>
+          <h2>The curator daemon</h2>
+          <span class="in-mod-tag">automation</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Inactivity-triggered batch job (not persistent) that maintains <i>agent-created skills only</i> — bundled and hub-installed skills are never touched. Two phases: deterministic LRU staleness/archive, then LLM consolidation. Pin hand-authored skills before the first real pass.</p>
+
+        <p>Trigger guards: at least <code>interval_hours</code> since last run (default <b>168h / 7 days</b>) AND agent idle for <code>min_idle_hours</code> (default <b>2h</b>). Runs as a one-shot batch when both conditions hold.</p>
+
+        <h3 class="in-h3">Two-phase run</h3>
+        <ol class="sk-list">
+          <li><b>Phase 1 — deterministic.</b> Skills unused for 30 days → <code>stale</code>. Unused for 90 days → moved to <code>~/.hermes/skills/.archive/</code>.</li>
+          <li><b>Phase 2 — LLM pass.</b> A short auxiliary-model review proposes consolidations, patches drift, or archives irrelevant skills. Max 8 iterations.</li>
+        </ol>
+
+        <h3 class="in-h3">Config</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+curator:
+  enabled: true
+  interval_hours: 168
+  min_idle_hours: 2
+  stale_after_days: 30
+  archive_after_days: 90
+  backup:
+    enabled: true
+    keep: 5          # snapshot retention
+
+auxiliary:
+  curator:
+    provider: openrouter
+    model: google/gemini-3-flash-preview
+    timeout: 600`}</code></pre>
+
+        <h3 class="in-h3">Commands</h3>
+        <table class="in-table">
+          <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>hermes curator status</code></td><td>Last run, skill counts, pinned list, LRU top 5</td></tr>
+            <tr><td><code>hermes curator run</code></td><td>Trigger immediately (blocking)</td></tr>
+            <tr><td><code>hermes curator run --dry-run</code></td><td>Preview mutations without writing</td></tr>
+            <tr><td><code>hermes curator run --background</code></td><td>Fire-and-forget</td></tr>
+            <tr><td><code>hermes curator pin &lt;skill&gt;</code></td><td>Protect from auto-transitions and deletion</td></tr>
+            <tr><td><code>hermes curator backup / rollback</code></td><td>Manual snapshot / restore</td></tr>
+            <tr><td><code>hermes curator pause / resume</code></td><td>Disable / re-enable scheduled runs</td></tr>
+          </tbody>
+        </table>
+
+        <p class="in-note-dim">Usage telemetry lives in <code>~/.hermes/skills/.usage.json</code>. Per-run reports go to <code>~/.hermes/logs/curator/&lt;timestamp&gt;/REPORT.md</code>.</p>
+      </section>
+
+      <!-- ===== §8 PORTABILITY ===== -->
+      <section id="s8" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">08</span>
+          <h2>Cross-runtime portability — the 3-tier framework</h2>
+          <span class="in-mod-tag">ecosystem</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> <code>compatibility</code> is the human-readable promise. <code>metadata.&lt;harness&gt;-portability-tier</code> is the machine-readable key. Three tiers; <b>agentskills-portable</b> is the right default for skills that don't need CC-specific hooks.</p>
+
+        <table class="in-table">
+          <thead><tr><th>Tier</th><th>Compatible runtimes</th><th>Constraint</th></tr></thead>
+          <tbody>
+            {portability.map((p) => (
+              <tr>
+                <td><b>{p.tier}</b><br/><code>{p.key}</code></td>
+                <td>{p.covers}</td>
+                <td>{p.constraint}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 class="in-h3">Decision rule</h3>
+        <ol class="sk-list">
+          <li>Does the body reference <code>.claude/</code>, <code>${"$"}{`{CLAUDE_SKILL_DIR}`}</code>, or CC-only tools? → <b>cc-native</b>.</li>
+          <li>Does every bundled script have a Windows parallel OR use a portable language? → <b>runtime-agnostic</b>.</li>
+          <li>Otherwise → <b>agentskills-portable</b>.</li>
+        </ol>
+
+        <p class="in-note">Hermes-specific fields (<code>metadata.hermes.*</code>, <code>platforms</code>, <code>required_environment_variables</code>) are silently ignored by all other runtimes — safe to include in any tier without breaking portability. As of May 2026, <a class="ix-inline-link" href="https://agentskills.io" rel="noopener">agentskills.io</a> lists 40+ compatible runtimes consuming the same SKILL.md format.</p>
+      </section>
+
+      <!-- ===== §9 PUBLISHING ===== -->
+      <section id="s9" class="sk-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">09</span>
+          <h2>Publishing &amp; distribution</h2>
+          <span class="in-mod-tag">registries</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Seven distribution paths from "<i>git push to GitHub repo</i>" to "<i>publish to HuggingFace skills index</i>". All hub installs go through <b>Skills Guard</b> static analysis (exfiltration patterns, prompt injection, destructive commands, invisible Unicode) — verdicts <code>safe</code> / <code>caution</code> / <code>dangerous</code>.</p>
+
+        <table class="in-table">
+          <thead><tr><th>Method</th><th>Command</th><th>Notes</th></tr></thead>
+          <tbody>
+            {distribution.map((d) => (
+              <tr>
+                <td><b>{d.method}</b></td>
+                <td><code>{d.cmd}</code></td>
+                <td>{d.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 class="in-h3">Hub maintenance</h3>
+        <pre class="ht-code"><code>{`hermes skills search <query>      # unified search across registries
+hermes skills check               # detect upstream changes in installed skills
+hermes skills update              # reinstall skills with available updates
+hermes skills audit               # re-run security scanner on hub skills
+hermes skills tap list / remove   # manage taps`}</code></pre>
+
+        <h3 class="in-h3">Local testing</h3>
+        <p>Hermes does not ship a dedicated <code>hermes skills validate</code> command. Recommended workflow:</p>
+        <ol class="sk-list">
+          <li><b>agentskills.io validator</b> (cross-runtime): <code>pip install skills-ref &amp;&amp; skills-ref validate ./my-skill</code></li>
+          <li><b>Smoke test</b>: <code>hermes chat -q "/my-skill help me with the thing"</code></li>
+          <li><b>Plugin debug</b>: <code>HERMES_PLUGINS_DEBUG=1 hermes plugins list</code></li>
+          <li><b>Curator dry-run</b>: <code>hermes curator run --dry-run</code> — preview auto-transitions without mutations</li>
+        </ol>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · SKILL AUTHORING · MIT · {new Date().getFullYear()} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .sk-page {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .sk-banner { text-align: center; margin-bottom: 2.5rem; }
+      .sk-banner .hc-subtag {
+        margin-top: 1rem;
+        max-width: 44rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .sk-banner .hc-subtag b { color: var(--color-gold); }
+      .sk-banner .hc-subtag code { color: var(--color-amber); }
+
+      .sk-mod { margin-bottom: 3.5rem; }
+      .sk-mod p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 1rem;
+        font-size: 0.97rem;
+      }
+      .sk-mod p code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.86em;
+      }
+      .sk-mod p b { color: var(--color-gold); }
+      .sk-mod p i { color: var(--color-fg-dim); }
+
+      .sk-mod h2 code {
+        color: var(--color-amber);
+        background: transparent;
+        font-family: var(--font-mono);
+        font-size: 0.8em;
+        font-weight: 700;
+      }
+      .sk-mod h3 code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-family: var(--font-mono);
+        font-size: 0.85em;
+      }
+
+      .sk-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+      .sk-card {
+        --sk-c: var(--color-gold);
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--sk-c);
+        padding: 1rem 1.15rem;
+      }
+      .sk-card h3 {
+        font-family: var(--font-display);
+        color: var(--sk-c);
+        margin: 0 0 0.2rem;
+        font-size: 1.2rem;
+      }
+      .sk-card-tag {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--color-fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.85rem !important;
+      }
+      .sk-card p {
+        font-size: 0.9rem !important;
+        margin-bottom: 0.6rem !important;
+      }
+      .sk-card p:last-child { margin-bottom: 0 !important; }
+      .sk-good {
+        background: var(--color-bg);
+        border-left: 2px solid var(--color-amber);
+        padding: 0.5rem 0.7rem;
+        font-size: 0.85rem !important;
+      }
+      .sk-card-gold  { --sk-c: var(--color-gold); }
+      .sk-card-amber { --sk-c: var(--color-amber); }
+
+      .sk-list {
+        margin: 0.5rem 0 1rem;
+        padding-left: 1.4rem;
+        line-height: 1.65;
+        font-size: 0.95rem;
+      }
+      .sk-list li {
+        margin-bottom: 0.55rem;
+        color: var(--color-fg);
+      }
+      .sk-list code {
+        background: var(--color-surface-mid);
+        color: var(--color-amber);
+        padding: 0.05rem 0.3rem;
+        font-size: 0.85em;
+      }
+      .sk-list b { color: var(--color-gold); }
+
+      .sk-method {
+        font-size: 0.78rem;
+        line-height: 1.4;
+        display: inline-block;
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #f7f7f5;
+          --color-surface-mid: #efefea;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .sk-mod { break-inside: avoid; }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
+  </body>
+</html>

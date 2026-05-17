@@ -5,7 +5,7 @@
 // Add a new surface? Add a row to RESOURCES below and a slug to CurrentPage.
 // Every page that imports this component picks it up automatically.
 
-export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to";
+export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to" | "routing" | "skills";
 
 interface Props {
   current: CurrentPage;
@@ -55,6 +55,20 @@ const RESOURCES: {
     title: "How-To",
     desc: "Ops guide — local install, VPS deploy, security hardening, optimization",
     href: `${base}/how-to/`,
+  },
+  {
+    slug: "routing",
+    num: "06",
+    title: "Routing",
+    desc: "30+ providers · auth · cost · fallback · hermes gateway · state.db queries",
+    href: `${base}/routing/`,
+  },
+  {
+    slug: "skills",
+    num: "07",
+    title: "Skill Authoring",
+    desc: "SKILL.md schema · ctx API · 5 kinds · curator · agentskills.io portability",
+    href: `${base}/skills/`,
   },
 ];
 ---

@@ -1,0 +1,519 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Routing · v${HERMES_VERSION}`;
+const pageDesc = `Provider matrix and routing strategy for Hermes Agent — 30+ LLM providers (OAuth + API key), context windows, costs per million tokens, fallback chain, hermes gateway as inverse-CCRouter, cost telemetry via state.db.`;
+
+const sections = [
+  { n: 1, slug: "matrix",   title: "Provider matrix",        tag: "reference"     },
+  { n: 2, slug: "auth",     title: "Auth modes",             tag: "credentials"   },
+  { n: 3, slug: "fallback", title: "Fallback chain",         tag: "reliability"   },
+  { n: 4, slug: "gateway",  title: "hermes gateway · proxy strategy", tag: "topology" },
+  { n: 5, slug: "cost",     title: "Cost telemetry · state.db",       tag: "monitoring" },
+  { n: 6, slug: "decide",   title: "Routing decision tree", tag: "strategy"      },
+  { n: 7, slug: "cache",    title: "Cross-session prompt cache",      tag: "optimization" },
+];
+
+const providers = [
+  { name: "Anthropic",          slug: "anthropic",       auth: "API key + OAuth",  env: "ANTHROPIC_API_KEY · CLAUDE_CODE_OAUTH_TOKEN", model: "claude-opus-4.7",        ctx: "1M",  inp: "$5",      out: "$25",     cache: "1.25×/2× write · 0.1× read", note: "OAuth uses Claude Pro/Team sub" },
+  { name: "Nous Portal",        slug: "nous",            auth: "OAuth device-code", env: "—",                                       model: "hermes + catalog",        ctx: "varies", inp: "free/paid", out: "free/paid", cache: "no",      note: "Curated, Nous-hosted" },
+  { name: "OpenRouter",         slug: "openrouter",      auth: "API key",          env: "OPENROUTER_API_KEY",                      model: "30+ aggregated",          ctx: "varies", inp: "varies",  out: "varies",   cache: "passthrough", note: "Pareto Code Router built-in" },
+  { name: "OpenAI",             slug: "openai",          auth: "API key",          env: "OPENAI_API_KEY",                          model: "gpt-5.4",                 ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "yes · 90% off", note: "Vision · tool-use · reasoning" },
+  { name: "OpenAI Codex",       slug: "openai-codex",    auth: "OAuth external",   env: "—",                                       model: "codex-series",            ctx: "TBD",  inp: "free (sub)", out: "free (sub)", cache: "no",   note: "ChatGPT Pro sub via gateway" },
+  { name: "xAI Grok",           slug: "xai",             auth: "API key",          env: "XAI_API_KEY",                             model: "grok-4.3 · grok-4.1-fast", ctx: "2M",   inp: "$1.25",   out: "$2.50",    cache: "yes · x-grok-conv-id", note: "Server-side tools $5/1k calls" },
+  { name: "xAI SuperGrok",      slug: "xai-oauth",       auth: "OAuth external",   env: "—",                                       model: "grok-4.x",                ctx: "2M",   inp: "free (sub)", out: "free (sub)", cache: "yes",  note: "SuperGrok sub via gateway" },
+  { name: "Google Gemini",      slug: "gemini",          auth: "API key",          env: "GOOGLE_API_KEY · GEMINI_API_KEY",         model: "gemini-2.5-pro",          ctx: "1M",   inp: "~$1.25",  out: "~$10",     cache: "context caching", note: "Vision · thinking · audio" },
+  { name: "Gemini CLI",         slug: "google-gemini-cli", auth: "OAuth external", env: "—",                                       model: "gemini-2.5-pro",          ctx: "1M",   inp: "free (sub)", out: "free (sub)", cache: "yes",  note: "via cloudcode-pa://google" },
+  { name: "Qwen Portal",        slug: "qwen-oauth",      auth: "OAuth external",   env: "—",                                       model: "Qwen 3.5",                ctx: "TBD",  inp: "free (sub)", out: "free (sub)", cache: "no",   note: "China-based, portal.qwen.ai" },
+  { name: "Alibaba / DashScope",slug: "alibaba",         auth: "API key",          env: "DASHSCOPE_API_KEY",                       model: "Qwen 3-series",           ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Intl endpoint; renaming to Qwen Cloud" },
+  { name: "MiniMax (OAuth)",    slug: "minimax-oauth",   auth: "OAuth (custom grant)", env: "—",                                   model: "MiniMax latest",          ctx: "TBD",  inp: "free (sub)", out: "free (sub)", cache: "no",   note: "Global + China endpoints" },
+  { name: "MiniMax (API)",      slug: "minimax",         auth: "API key",          env: "MINIMAX_API_KEY",                         model: "MiniMax latest",          ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Anthropic-compat endpoint" },
+  { name: "DeepSeek",           slug: "deepseek",        auth: "API key",          env: "DEEPSEEK_API_KEY",                        model: "DeepSeek-V3 / R1",        ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "R1 reasoning model" },
+  { name: "AWS Bedrock",        slug: "bedrock",         auth: "AWS SDK chain",    env: "IAM / SSO / AWS_*",                       model: "Opus 4.7 · Nova · Llama 4", ctx: "per model", inp: "AWS",     out: "AWS",      cache: "Claude models", note: "Cross-region inference profiles" },
+  { name: "GitHub Copilot",     slug: "copilot",         auth: "Credential infer", env: "COPILOT_GITHUB_TOKEN · gh auth",         model: "GPT-series (live)",       ctx: "per model", inp: "free (sub)", out: "free (sub)", cache: "no",   note: "Auto-detects gh CLI auth" },
+  { name: "Hugging Face",       slug: "huggingface",     auth: "API key",          env: "HF_TOKEN",                                model: "20+ via router",          ctx: "varies", inp: "varies",  out: "varies",   cache: "no",     note: "Routes serverless providers" },
+  { name: "StepFun",            slug: "stepfun",         auth: "API key",          env: "STEPFUN_API_KEY",                         model: "Step-series",             ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "step_plan/v1 endpoint" },
+  { name: "Kimi / Moonshot",    slug: "kimi-coding",     auth: "API key",          env: "KIMI_API_KEY",                            model: "kimi-latest",             ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Global + CN endpoints" },
+  { name: "Z.AI / GLM",         slug: "zai",             auth: "API key",          env: "GLM_API_KEY · ZAI_API_KEY",               model: "GLM-series",              ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "api.z.ai paas/v4" },
+  { name: "NVIDIA NIM",         slug: "nvidia",          auth: "API key",          env: "NVIDIA_API_KEY",                          model: "Llama · Mistral · …",      ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "integrate.api.nvidia.com" },
+  { name: "Ollama Cloud",       slug: "ollama-cloud",    auth: "API key",          env: "OLLAMA_API_KEY",                          model: "any Ollama-served",       ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Not the same as local Ollama" },
+  { name: "LM Studio",          slug: "lmstudio",        auth: "API key",          env: "LM_API_KEY",                              model: "local models",            ctx: "hardware", inp: "$0",   out: "$0",       cache: "no",     note: "127.0.0.1:1234/v1" },
+  { name: "Vercel AI Gateway",  slug: "ai-gateway",      auth: "API key",          env: "AI_GATEWAY_API_KEY",                      model: "Kimi · Qwen · GLM · Claude", ctx: "per", inp: "varies", out: "varies",   cache: "no",     note: "Aggregator, Kimi as default" },
+  { name: "Arcee AI",           slug: "arcee",           auth: "API key",          env: "ARCEEAI_API_KEY",                         model: "Arcee-series",            ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Specialized fine-tunes" },
+  { name: "OpenCode Zen/Go",    slug: "opencode-*",      auth: "API key",          env: "OPENCODE_ZEN_API_KEY · …_GO_…",          model: "varies",                  ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "models.dev merge" },
+  { name: "Kilo Code",          slug: "kilocode",        auth: "API key",          env: "KILOCODE_API_KEY",                        model: "varies",                  ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "api.kilo.ai gateway" },
+  { name: "Xiaomi MiMo",        slug: "xiaomi",          auth: "API key",          env: "XIAOMI_API_KEY",                          model: "MiMo-series",             ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "api.xiaomimimo.com/v1" },
+  { name: "Tencent TokenHub",   slug: "tencent-tokenhub",auth: "API key",          env: "TOKENHUB_API_KEY",                        model: "Tencent",                 ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "tokenhub.tencentmaas.com" },
+  { name: "GMI Cloud",          slug: "gmi",             auth: "API key",          env: "GMI_API_KEY",                             model: "GMI-served",              ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "api.gmi-serving.com" },
+  { name: "NovitaAI",           slug: "novita",          auth: "API key",          env: "NOVITA_API_KEY",                          model: "various",                 ctx: "TBD",  inp: "TBD",     out: "TBD",      cache: "no",     note: "Configurable base URL" },
+  { name: "Azure Foundry",      slug: "azure-foundry",   auth: "API key",          env: "AZURE_FOUNDRY_API_KEY",                   model: "Azure-hosted",            ctx: "per", inp: "TBD",    out: "TBD",      cache: "no",     note: "User-provided base URL" },
+];
+
+const fallbackTriggers = [
+  { code: "429", behavior: "Rate limit → fallback after retry budget" },
+  { code: "500/502/503", behavior: "Server error → fallback after retry budget" },
+  { code: "401/403", behavior: "Auth failure → immediate fallback (no retries)" },
+  { code: "404", behavior: "Not found → immediate fallback" },
+  { code: "—", behavior: "Malformed / empty response → fallback after repeated invalid" },
+];
+
+const decisionTree = [
+  { q: "Have a paid subscription (Claude Pro · ChatGPT Pro · SuperGrok)?",      a: "Use the OAuth provider — zero marginal cost" },
+  { q: "Task is coding / agentic and latency-sensitive?",                        a: "Anthropic direct (Sonnet 4.6 balance · Haiku 4.5 budget)" },
+  { q: "Need 1M+ context window at low cost?",                                   a: "Gemini 2.5 Flash (~$0.075/$0.30) · or Opus with 1h cache for quality" },
+  { q: "Need frontier reasoning at lowest API cost?",                            a: "Grok 4.3 ($1.25/$2.50) · or Grok 4.1 Fast (2M ctx, $0.20/$0.50)" },
+  { q: "Route across multiple providers with a single key?",                     a: "OpenRouter — Pareto Code Router picks cheapest qualifying coding model" },
+  { q: "Air-gapped / offline?",                                                  a: "LM Studio or local Ollama — $0 marginal, hardware-bound" },
+  { q: "On AWS with IAM/SSO already?",                                           a: "Bedrock — Claude · Nova · Llama 4 · DeepSeek under one bill" },
+  { q: "Target model Chinese-hosted (Qwen · Kimi · MiniMax · GLM)?",             a: "Global: DashScope · Kimi · Z.AI — CN CDN: Kimi-CN · MiniMax-CN" },
+  { q: "Want free / experimental tiers?",                                        a: "Nous Portal free tier · OpenRouter free-tier models (zero-priced)" },
+  { q: "Fallback for everything else?",                                          a: "fallback_providers: openrouter:google/gemini-3-flash → openrouter:anthropic/claude-haiku-4" },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/routing/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="routing" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="rt-page">
+      <section class="rt-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · ROUTING</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>30+ PROVIDERS ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">PICK A</span>
+          <span class="hc-title-line hc-title-accent">PROVIDER</span>
+        </h1>
+        <p class="hc-tag">MATRIX · AUTH · FALLBACK · PROXY · COST · CACHE</p>
+        <p class="hc-subtag">
+          Hermes ships with native fallback chains, an OpenAI-compatible gateway that turns OAuth subscriptions into endpoints, and granular cost telemetry per session. The <b>inverse of CCRouter</b>: instead of routing your CLI <i>out</i> to providers, Hermes is the cloud-backed server your other tools route <i>into</i>.
+        </p>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          {sections.map((s) => (
+            <li>
+              <a href={`#s${s.n}`}>
+                <span class="in-toc-n">{String(s.n).padStart(2, "0")}</span>
+                <span class="in-toc-title">{s.title}</span>
+                <span class="in-toc-tag">{s.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §1 PROVIDER MATRIX ===== -->
+      <section id="s1" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">01</span>
+          <h2>Provider matrix</h2>
+          <span class="in-mod-tag">reference</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> 32 providers as of v0.14.0. Three auth shapes — OAuth (subscription-backed, no marginal cost), API key (majority), credential inference (Bedrock / Copilot). Mistral removed post May 2026 PyPI quarantine. Pricing snapshot from each provider's public docs.</p>
+
+        <p class="in-note-dim">Wide table — scroll horizontally on small viewports. <code>TBD</code> = not published in publicly-accessible docs at research time. Prices are <i>base tier, no caching</i>; cache hits typically slash input cost 5–10×.</p>
+
+        <div class="rt-table-wrap">
+          <table class="in-table rt-table-dense">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Auth</th>
+                <th>Env var</th>
+                <th>Headline model</th>
+                <th>Ctx</th>
+                <th>In $/MTok</th>
+                <th>Out $/MTok</th>
+                <th>Cache</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {providers.map((p) => (
+                <tr>
+                  <td><b>{p.name}</b><br/><code class="rt-slug">{p.slug}</code></td>
+                  <td>{p.auth}</td>
+                  <td><code>{p.env}</code></td>
+                  <td>{p.model}</td>
+                  <td><code>{p.ctx}</code></td>
+                  <td>{p.inp}</td>
+                  <td>{p.out}</td>
+                  <td>{p.cache}</td>
+                  <td>{p.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== §2 AUTH MODES ===== -->
+      <section id="s2" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">02</span>
+          <h2>Auth modes</h2>
+          <span class="in-mod-tag">credentials</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Three distinct auth shapes. <b>OAuth</b> for subscription-backed providers (Nous Portal, Codex, SuperGrok, Gemini CLI, Qwen Portal, MiniMax) — zero marginal cost but ToS-sensitive at scale. <b>API key</b> for the 20+ majority — bearer token in <code>~/.hermes/.env</code>. <b>Credential inference</b> for Copilot (auto-detects <code>gh auth</code>) and Bedrock (boto3 SDK chain).</p>
+
+        <p><b>OAuth providers</b> store a token locally after a one-time browser login. Advantage: the subscription has already paid for inference, so per-turn cost is effectively zero. Constraint: the token is personal and bound to ToS — programmatic mass use may breach terms.</p>
+
+        <p><b>API key</b> is the default path for 20+ providers. Keys go in <code>~/.hermes/.env</code> with <code>chmod 0600</code>. Anthropic is unusual in supporting both: <code>ANTHROPIC_API_KEY</code> for direct billing OR <code>CLAUDE_CODE_OAUTH_TOKEN</code> for Claude Pro/Team subscription access.</p>
+
+        <p><b>Credential inference</b> applies to two providers. GitHub Copilot auto-detects <code>gh auth token</code> without a dedicated env var. AWS Bedrock uses the standard boto3 chain (IAM role · SSO · <code>AWS_ACCESS_KEY_ID</code>/<code>AWS_SECRET_ACCESS_KEY</code>) — whichever credential the SDK resolves at runtime is what Hermes uses, so there's no Hermes-specific env var to set.</p>
+      </section>
+
+      <!-- ===== §3 FALLBACK CHAIN ===== -->
+      <section id="s3" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">03</span>
+          <h2>Fallback chain</h2>
+          <span class="in-mod-tag">reliability</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Per-turn (not per-session). HTTP status + repeated invalid responses trigger walk-down. <code>billing_provider</code> in <code>state.db</code> records who actually served — so the column shows the fallback's slug, not the primary's.</p>
+
+        <h3 class="in-h3">Config YAML</h3>
+        <pre class="ht-code"><code>{`# ~/.hermes/config.yaml
+
+# Preferred — list form (current)
+fallback_providers:
+  - provider: openrouter
+    model: google/gemini-3-flash-preview
+  - provider: openrouter
+    model: anthropic/claude-haiku-4
+
+# Legacy — single entry (still honored, lower priority,
+# appended at the end of the merged list)
+fallback_model:
+  provider: openrouter
+  model: anthropic/claude-sonnet-4`}</code></pre>
+
+        <h3 class="in-h3">Trigger conditions</h3>
+        <table class="in-table">
+          <thead><tr><th>HTTP status</th><th>Behavior</th></tr></thead>
+          <tbody>
+            {fallbackTriggers.map((t) => (
+              <tr><td><code>{t.code}</code></td><td>{t.behavior}</td></tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p class="in-note"><b>Scope &amp; billing.</b> Fallback walks at most once end-to-end per turn — each new message starts at the primary again. The <code>billing_provider</code>, <code>billing_mode</code>, and <code>cost_source</code> columns in <code>state.db.sessions</code> reflect the actual server; <code>actual_cost_usd</code> vs <code>estimated_cost_usd</code> disambiguates pricing certainty.</p>
+      </section>
+
+      <!-- ===== §4 GATEWAY / PROXY ===== -->
+      <section id="s4" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">04</span>
+          <h2><code>hermes gateway</code> &middot; proxy strategy</h2>
+          <span class="in-mod-tag">topology</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Hermes ships an OpenAI-compatible HTTP server. Locally bound (<code>127.0.0.1:8642</code>) by default. With <code>API_SERVER_KEY</code> + reverse proxy you expose it remotely. The <b>inverse of CCRouter</b>: instead of routing your CLI out to many providers, your OAuth subscription becomes the cloud-backed server that Codex / Aider / Cline / Continue call into.</p>
+
+        <h3 class="in-h3">Start — local only</h3>
+        <pre class="ht-code"><code>{`API_SERVER_ENABLED=true hermes gateway
+# → http://127.0.0.1:8642
+# Endpoints:
+#   POST /v1/chat/completions
+#   POST /v1/responses
+#   GET  /v1/models
+#   POST /v1/runs · /events · /stop
+#   GET  /health`}</code></pre>
+
+        <h3 class="in-h3">Start — remote / team</h3>
+        <pre class="ht-code"><code>{`API_SERVER_ENABLED=true \\
+API_SERVER_HOST=0.0.0.0 \\
+API_SERVER_KEY=<long-random-token> \\
+API_SERVER_PORT=8642 \\
+hermes gateway
+
+# Reverse-proxy with TLS in front (see /how-to/ §2 for Caddy/nginx snippets).
+# Never bind 0.0.0.0 without BOTH the key AND TLS termination.`}</code></pre>
+
+        <p>When the active provider is OAuth-backed (Claude Pro via <code>CLAUDE_CODE_OAUTH_TOKEN</code>, SuperGrok via <code>xai-oauth</code>, Codex via <code>openai-codex</code>), the gateway forwards through the subscription credential. Tools that only speak OpenAI format — Codex CLI, Aider, Cline, VS Code Continue — point at <code>http://127.0.0.1:8642/v1</code> and transparently consume the subscription without their own API keys.</p>
+
+        <p class="in-note"><b>Caveats.</b> The <code>model</code> field sent by clients is cosmetic — actual model selection is Hermes server-side. Maximum 100 stored responses (LRU). No file-upload (inline images only). Remote access gives full terminal/tool access to the caller — treat the bearer token like a root password.</p>
+      </section>
+
+      <!-- ===== §5 COST TELEMETRY ===== -->
+      <section id="s5" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>Cost telemetry &middot; <code>state.db</code></h2>
+          <span class="in-mod-tag">monitoring</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Five SQLite queries answer the operational questions. <code>~/.hermes/state.db</code> (WAL mode) tracks <code>estimated_cost_usd</code>, <code>actual_cost_usd</code>, full token breakdown, and <code>billing_provider</code> per session.</p>
+
+        <h3 class="in-h3">Daily spend</h3>
+        <pre class="ht-code"><code>{`SELECT date(started_at, 'unixepoch') AS day,
+       SUM(estimated_cost_usd) AS daily_usd
+FROM sessions
+GROUP BY day
+ORDER BY day DESC;
+-- "how much did Hermes cost me today and by day?"`}</code></pre>
+
+        <h3 class="in-h3">Per-provider breakdown</h3>
+        <pre class="ht-code"><code>{`SELECT billing_provider,
+       COUNT(*)                AS sessions,
+       SUM(estimated_cost_usd) AS total_estimated_usd,
+       SUM(actual_cost_usd)    AS total_actual_usd
+FROM sessions
+WHERE billing_provider IS NOT NULL
+GROUP BY billing_provider
+ORDER BY total_estimated_usd DESC;
+-- "which provider is eating my budget?"`}</code></pre>
+
+        <h3 class="in-h3">Cache hit ratio</h3>
+        <pre class="ht-code"><code>{`SELECT SUM(cache_read_tokens)  AS cache_hits,
+       SUM(cache_write_tokens) AS cache_writes,
+       ROUND(100.0 * SUM(cache_read_tokens) /
+             NULLIF(SUM(cache_read_tokens) + SUM(cache_write_tokens), 0), 2)
+       AS cache_hit_pct
+FROM sessions;
+-- "is prompt caching paying off?" (>50% hit rate = positive ROI for 1h TTL)`}</code></pre>
+
+        <h3 class="in-h3">Runaway session detection</h3>
+        <pre class="ht-code"><code>{`SELECT id, title, model, billing_provider,
+       input_tokens + output_tokens         AS total_tokens,
+       estimated_cost_usd,
+       round((ended_at - started_at)/60.0,1) AS duration_min
+FROM sessions
+WHERE estimated_cost_usd > 1.0      -- adjust threshold
+   OR total_tokens > 500000
+ORDER BY estimated_cost_usd DESC
+LIMIT 20;
+-- "which sessions went deep or expensive unexpectedly?"`}</code></pre>
+
+        <h3 class="in-h3">Fallback visibility</h3>
+        <pre class="ht-code"><code>{`SELECT model, billing_provider, COUNT(*) AS turns
+FROM sessions
+WHERE model NOT LIKE billing_provider || '%'    -- proxy: primary != actual
+GROUP BY model, billing_provider
+ORDER BY turns DESC;
+-- "how often did fallback fire, and to which provider?"`}</code></pre>
+      </section>
+
+      <!-- ===== §6 DECISION TREE ===== -->
+      <section id="s6" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">06</span>
+          <h2>Routing decision tree</h2>
+          <span class="in-mod-tag">strategy</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Walk this top-to-bottom. The first <code>yes</code> wins.</p>
+
+        <ol class="rt-decide">
+          {decisionTree.map((step, i) => (
+            <li>
+              <span class="rt-decide-n">{String(i + 1).padStart(2, "0")}</span>
+              <span class="rt-decide-q">{step.q}</span>
+              <span class="rt-decide-a">→ {step.a}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- ===== §7 CROSS-SESSION CACHE ===== -->
+      <section id="s7" class="rt-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">07</span>
+          <h2>Cross-session prompt cache</h2>
+          <span class="in-mod-tag">optimization</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Two cross-session strategies in Hermes — Anthropic <i>1-hour</i> TTL via <code>cache_control</code>, and xAI Grok via the <code>x-grok-conv-id</code> header. Verifiable signal: <code>cache_read_tokens</code> and <code>cache_write_tokens</code> in <code>state.db</code>.</p>
+
+        <h3 class="in-h3">Anthropic 1-hour cache</h3>
+        <p>Implemented via <code>apply_anthropic_cache_control(cache_ttl="1h")</code>. The system prompt and long context blocks are tagged with the 1h <code>cache_control</code> marker; the API holds the KV cache server-side for up to 60 minutes. Subsequent requests sharing the same prefix (within 1h, same API key org) read at <b>0.1× input price</b>. The write costs <b>2× base input price</b>, so the breakeven is two reads. Fires automatically for Anthropic-backed sessions.</p>
+
+        <h3 class="in-h3">xAI Grok continuity</h3>
+        <p>When the provider base URL contains <code>x.ai</code>, Hermes attaches <code>x-grok-conv-id</code> on every request in a conversation. This routes all turns of the same session to the same xAI backend server, enabling xAI's server-side system-prompt caching. The TTL is xAI-managed (not user-configurable). The observable signal: <code>cache_read_tokens</code> drops once the first turn has warmed the cache.</p>
+
+        <p class="in-note-dim">Stable-prefix discipline matters. Anything before the cache breakpoint must be byte-for-byte identical across requests — see <a class="ix-inline-link" href={`${base}/how-to/#s4`}>How-To §4 · prompt cache discipline</a>.</p>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · ROUTING · MIT · {new Date().getFullYear()} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .rt-page {
+        max-width: 64rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .rt-banner {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .rt-banner .hc-subtag {
+        margin-top: 1rem;
+        max-width: 44rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .rt-banner .hc-subtag b { color: var(--color-gold); }
+      .rt-banner .hc-subtag i { color: var(--color-fg-dim); }
+
+      .rt-mod { margin-bottom: 3.5rem; }
+      .rt-mod p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 1rem;
+        font-size: 0.97rem;
+      }
+      .rt-mod p code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.86em;
+      }
+      .rt-mod p b { color: var(--color-gold); }
+      .rt-mod p i { color: var(--color-fg-dim); }
+
+      .rt-mod h2 code {
+        color: var(--color-amber);
+        background: transparent;
+        font-size: 0.8em;
+        font-family: var(--font-mono);
+        font-weight: 700;
+      }
+
+      .rt-table-wrap {
+        overflow-x: auto;
+        margin: 0.5rem 0 1rem;
+        border: 1px solid var(--color-bronze);
+      }
+      .rt-table-dense {
+        margin: 0;
+        font-size: 0.78rem;
+        min-width: 60rem;
+      }
+      .rt-table-dense th {
+        padding: 0.45rem 0.6rem;
+        white-space: nowrap;
+        background: var(--color-surface);
+        position: sticky;
+        top: 0;
+      }
+      .rt-table-dense td {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.78rem;
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      .rt-table-dense td:last-child,
+      .rt-table-dense td:nth-child(4) {
+        white-space: normal;
+      }
+      .rt-table-dense td code {
+        font-size: 0.75rem;
+        color: var(--color-amber);
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.3rem;
+      }
+      .rt-slug {
+        color: var(--color-fg-dim) !important;
+        background: transparent !important;
+        font-size: 0.7rem !important;
+        padding: 0 !important;
+      }
+
+      .rt-decide {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        counter-reset: rt;
+      }
+      .rt-decide li {
+        display: grid;
+        grid-template-columns: 2.25rem 1fr;
+        gap: 0.75rem 1rem;
+        padding: 0.85rem 1rem;
+        background: var(--color-surface);
+        border-left: 3px solid var(--color-gold);
+        margin-bottom: 0.5rem;
+      }
+      .rt-decide-n {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--color-bronze);
+        grid-row: 1 / 3;
+      }
+      .rt-decide-q {
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--color-fg);
+        font-size: 1rem;
+      }
+      .rt-decide-a {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--color-amber);
+        line-height: 1.5;
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #f7f7f5;
+          --color-surface-mid: #efefea;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .rt-mod { break-inside: avoid; }
+        .rt-table-wrap { overflow: visible; }
+        .rt-table-dense { min-width: 0; font-size: 7pt; }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
+  </body>
+</html>
