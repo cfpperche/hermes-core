@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const siteUrl = "https://cfpperche.github.io";
@@ -27,11 +28,12 @@ const pageDesc = `Capability digest for Hermes Agent v${HERMES_VERSION} (${HERME
   <body class="hc-body">
     <header class="hc-top">
       <a href={`${base}/`} class="hc-back">← hermes-core</a>
-      <nav class="hc-nav">
-        <a href={`${base}/cheatsheet/hermes-agent/`}>cheatsheet</a>
-        <a href={`${base}/masterclass/hermes-agent/`}>master class</a>
-        <span class="hc-here">foundation release</span>
-      </nav>
+      <ResourcesMenu current="foundation" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF (uses browser PDF)">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
     </header>
 
     <main class="fr-page">
@@ -405,5 +407,12 @@ TEAMS_PORT=3978`}</code></pre>
         .fr-theme { break-inside: avoid; }
       }
     </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
   </body>
 </html>

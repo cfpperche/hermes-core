@@ -76,3 +76,51 @@
     color: var(--color-gold);
   }
 }
+
+/* ===== SHARED TOP BAR PRIMITIVES (used by every surface) ===== */
+.hc-top {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--color-bronze);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  flex-wrap: wrap;
+}
+.hc-back {
+  color: var(--color-amber);
+  white-space: nowrap;
+}
+.hc-back:hover { color: var(--color-gold); }
+
+.hc-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cs-tool-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-bronze);
+  color: var(--color-fg-dim);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: all 120ms;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.cs-tool-btn:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+}
+
+@media print {
+  .hc-top { display: none !important; }
+}

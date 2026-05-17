@@ -1,5 +1,6 @@
 ---
 import "../../styles/global.css";
+import ResourcesMenu from "../../components/ResourcesMenu.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const siteUrl = "https://cfpperche.github.io";
@@ -34,11 +35,12 @@ const modules = [
   <body class="hc-body">
     <header class="hc-top">
       <a href={`${base}/`} class="hc-back">← hermes-core</a>
-      <nav class="hc-nav">
-        <a href={`${base}/cheatsheet/hermes-agent/`}>cheatsheet</a>
-        <span class="hc-here">master class</span>
-        <a href={`${base}/foundation-release/`}>foundation release</a>
-      </nav>
+      <ResourcesMenu current="masterclass" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF (uses browser PDF)">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
     </header>
 
     <main class="mc-page">
@@ -380,5 +382,12 @@ const modules = [
         .mc-mod { break-inside: avoid; }
       }
     </style>
+
+    <script is:inline>
+      (() => {
+        const pdf = document.getElementById("hc-pdf");
+        if (pdf) pdf.addEventListener("click", () => window.print());
+      })();
+    </script>
   </body>
 </html>

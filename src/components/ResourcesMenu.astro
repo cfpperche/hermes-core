@@ -1,0 +1,185 @@
+---
+// ResourcesMenu — single source of truth for cross-page nav across the
+// Hermes Agent learning surface (cheatsheet · master class · foundation release).
+//
+// Add a new surface? Add a row to RESOURCES below and a slug to CurrentPage.
+// Every page that imports this component picks it up automatically.
+
+export type CurrentPage = "cheatsheet" | "masterclass" | "foundation";
+
+interface Props {
+  current: CurrentPage;
+}
+
+const { current } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const RESOURCES: {
+  slug: CurrentPage;
+  num: string;
+  title: string;
+  desc: string;
+  href: string;
+}[] = [
+  {
+    slug: "cheatsheet",
+    num: "01",
+    title: "Cheatsheet",
+    desc: "Dense single-page reference — every CLI command, flag, hook, env var",
+    href: `${base}/cheatsheet/hermes-agent/`,
+  },
+  {
+    slug: "masterclass",
+    num: "02",
+    title: "Master Class",
+    desc: "6-module mental model — session flow, identity, hooks, peers, scale",
+    href: `${base}/masterclass/hermes-agent/`,
+  },
+  {
+    slug: "foundation",
+    num: "03",
+    title: "Foundation Release",
+    desc: "v0.14.0 digest — PyPI, Grok 1M, proxy, Teams, LSP per write",
+    href: `${base}/foundation-release/`,
+  },
+];
+---
+
+<details class="rm">
+  <summary class="rm-btn" aria-haspopup="menu">
+    <span>Resources</span>
+    <span class="rm-caret" aria-hidden="true">▾</span>
+  </summary>
+  <div class="rm-panel" role="menu">
+    {RESOURCES.map((r) => {
+      const isCurrent = r.slug === current;
+      return (
+        <a
+          href={r.href}
+          class="rm-item"
+          aria-current={isCurrent ? "page" : undefined}
+          role="menuitem"
+        >
+          <span class="rm-num">{r.num}</span>
+          <span class="rm-text">
+            <span class="rm-title">
+              {r.title}
+              {isCurrent && <span class="rm-here"> · you are here</span>}
+            </span>
+            <span class="rm-desc">{r.desc}</span>
+          </span>
+        </a>
+      );
+    })}
+  </div>
+</details>
+
+<style>
+  .rm {
+    position: relative;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+  }
+  .rm-btn {
+    cursor: pointer;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 1px solid var(--color-bronze, #CD7F32);
+    color: var(--color-bronze, #CD7F32);
+    letter-spacing: 0.08em;
+    background: transparent;
+    user-select: none;
+    text-transform: uppercase;
+  }
+  .rm-btn::-webkit-details-marker { display: none; }
+  .rm-btn::marker { display: none; content: ""; }
+  .rm-btn:hover {
+    color: var(--color-gold, #FFD700);
+    border-color: var(--color-gold, #FFD700);
+  }
+  .rm[open] > .rm-btn {
+    background: var(--color-surface-mid, #2a2a44);
+    color: var(--color-gold, #FFD700);
+    border-color: var(--color-gold, #FFD700);
+  }
+  .rm-caret { transition: transform 0.15s; font-size: 9px; }
+  .rm[open] .rm-caret { transform: rotate(180deg); }
+
+  .rm-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 340px;
+    max-width: calc(100vw - 32px);
+    background: var(--color-surface, #1a1a2e);
+    border: 1px solid var(--color-bronze, #CD7F32);
+    padding: 6px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  }
+
+  .rm-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 10px;
+    text-decoration: none;
+    color: var(--color-fg, #FFF8DC);
+    border-left: 2px solid transparent;
+    transition: background 0.1s, border-left-color 0.1s, color 0.1s;
+  }
+  .rm-item:hover {
+    background: var(--color-surface-mid, #2a2a44);
+    border-left-color: var(--color-amber, #FFBF00);
+    color: var(--color-fg, #FFF8DC);
+  }
+  .rm-item[aria-current="page"] {
+    background: var(--color-bg, #0d0d1a);
+    border-left-color: var(--color-gold, #FFD700);
+  }
+
+  .rm-num {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 10.5px;
+    color: var(--color-bronze, #CD7F32);
+    font-weight: 700;
+    min-width: 18px;
+    padding-top: 2px;
+    letter-spacing: 0.04em;
+  }
+  .rm-item[aria-current="page"] .rm-num { color: var(--color-gold, #FFD700); }
+
+  .rm-text { display: flex; flex-direction: column; gap: 2px; }
+  .rm-title {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-fg, #FFF8DC);
+    letter-spacing: 0.02em;
+  }
+  .rm-item[aria-current="page"] .rm-title { color: var(--color-gold, #FFD700); }
+  .rm-here {
+    color: var(--color-fg-dim, #8B8682);
+    font-weight: 400;
+    font-size: 10.5px;
+    letter-spacing: 0;
+  }
+  .rm-desc {
+    font-size: 10.5px;
+    color: var(--color-fg-dim, #8B8682);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 600px) {
+    .rm-panel { min-width: 260px; }
+  }
+  @media print {
+    .rm { display: none !important; }
+  }
+</style>

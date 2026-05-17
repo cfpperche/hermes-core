@@ -1,5 +1,6 @@
 ---
 import "../../styles/global.css";
+import ResourcesMenu from "../../components/ResourcesMenu.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const siteUrl = "https://cfpperche.github.io";
@@ -27,11 +28,20 @@ const pageDesc = `One-page dense reference for Hermes Agent v${HERMES_VERSION}: 
   <body class="hc-body">
     <header class="hc-top">
       <a href={`${base}/`} class="hc-back">← hermes-core</a>
-      <nav class="hc-nav">
-        <a href={`${base}/masterclass/hermes-agent/`}>master class</a>
-        <a href={`${base}/foundation-release/`}>foundation release</a>
-        <span class="hc-here">cheatsheet</span>
-      </nav>
+      <ResourcesMenu current="cheatsheet" />
+      <div class="cs-toolbar" role="toolbar" aria-label="Cheatsheet tools">
+        <input
+          id="cs-search"
+          type="search"
+          placeholder="search · commands · flags · hooks · env vars   (press /)"
+          aria-label="Search cheatsheet"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="cs-pdf" type="button" class="cs-tool-btn" title="Print as PDF (uses browser PDF)">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
     </header>
 
     <main class="hc-page">
@@ -537,32 +547,44 @@ const pageDesc = `One-page dense reference for Hermes Agent v${HERMES_VERSION}: 
         min-height: 100vh;
       }
 
-      .hc-top {
+      .cs-toolbar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid var(--color-bronze);
-        background: var(--color-surface);
+        gap: 6px;
+        flex: 1;
+        min-width: 240px;
+      }
+      .cs-toolbar input {
+        flex: 1;
+        background: var(--color-bg);
+        border: 1px solid var(--color-bronze);
+        color: var(--color-fg);
+        padding: 6px 12px;
         font-family: var(--font-mono);
-        font-size: 0.8rem;
-        letter-spacing: 0.05em;
+        font-size: 12px;
+        outline: none;
+        transition: border-color 120ms;
+        min-width: 0;
       }
-      .hc-back {
-        color: var(--color-amber);
+      .cs-toolbar input::placeholder { color: var(--color-fg-dim); }
+      .cs-toolbar input:focus { border-color: var(--color-gold); }
+      .cs-toolbar input::-webkit-search-cancel-button { display: none; }
+
+      /* ===== SEARCH DIMMING ===== */
+      .hc-card {
+        transition: opacity 200ms ease, transform 200ms ease, box-shadow 200ms ease;
       }
-      .hc-back:hover { color: var(--color-gold); }
-      .hc-nav {
-        display: flex;
-        gap: 1.5rem;
+      body.search-active article.hc-card:not(.search-match) {
+        opacity: 0.12;
+        transform: scale(0.99);
       }
-      .hc-nav a {
-        color: var(--color-fg-dim);
+      body.search-active article.hc-card.search-match {
+        box-shadow: 0 0 24px color-mix(in srgb, var(--hc-c, var(--color-gold)) 32%, transparent);
       }
-      .hc-nav a:hover { color: var(--color-gold); }
-      .hc-here {
-        color: var(--color-gold);
-        font-weight: 700;
+      body.search-active .hc-part,
+      body.search-active .hc-hub,
+      body.search-active .hc-banner {
+        opacity: 0.35;
       }
 
       .hc-page {
@@ -908,7 +930,56 @@ const pageDesc = `One-page dense reference for Hermes Agent v${HERMES_VERSION}: 
         .hc-top, .hc-foot { display: none; }
         .hc-card { break-inside: avoid; border: 1px solid #999; }
         .hc-part { break-before: page; }
+        body.search-active article.hc-card { opacity: 1 !important; transform: none !important; }
+        body.search-active .hc-part,
+        body.search-active .hc-hub,
+        body.search-active .hc-banner { opacity: 1 !important; }
       }
     </style>
+
+    <script is:inline>
+      (() => {
+        const body = document.body;
+        const search = document.getElementById("cs-search");
+        const pdf = document.getElementById("cs-pdf");
+        const cards = Array.from(document.querySelectorAll("article.hc-card"));
+
+        // Fuzzy search — dim non-matching cards
+        if (search) {
+          const apply = () => {
+            const q = search.value.toLowerCase().trim();
+            if (!q) {
+              body.classList.remove("search-active");
+              cards.forEach((c) => c.classList.remove("search-match"));
+              return;
+            }
+            body.classList.add("search-active");
+            cards.forEach((c) => {
+              const txt = (c.textContent || "").toLowerCase();
+              c.classList.toggle("search-match", txt.includes(q));
+            });
+          };
+          search.addEventListener("input", apply);
+          document.addEventListener("keydown", (e) => {
+            const t = e.target;
+            const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+            if (e.key === "/" && !inField) {
+              e.preventDefault();
+              search.focus();
+              search.select();
+            } else if (e.key === "Escape" && document.activeElement === search) {
+              search.value = "";
+              apply();
+              search.blur();
+            }
+          });
+        }
+
+        // PDF / print
+        if (pdf) {
+          pdf.addEventListener("click", () => window.print());
+        }
+      })();
+    </script>
   </body>
 </html>
