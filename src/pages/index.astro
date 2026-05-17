@@ -1,0 +1,394 @@
+---
+import "../styles/global.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = "hermes-core · learning surface for Hermes Agent";
+const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VERSION} (NousResearch): dense cheatsheet, Master Class on the mental model, and v0.14.0 Foundation Release digest. Static site, MIT-licensed.`;
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={`${siteUrl}${base}/`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="ix-body">
+    <header class="ix-top">
+      <div class="ix-mark">
+        <span class="ix-caduceus" aria-hidden="true">☤</span>
+        <span class="ix-mark-text">HERMES-CORE</span>
+      </div>
+      <nav class="ix-nav">
+        <a href="https://github.com/cfpperche/hermes-core" class="ix-nav-link" rel="noopener">github</a>
+        <a href="https://github.com/NousResearch/hermes-agent" class="ix-nav-link" rel="noopener">hermes-agent ↗</a>
+      </nav>
+    </header>
+
+    <main class="ix-main">
+      <section class="ix-hero">
+        <div class="ix-strip">
+          <span>▮ HERMES-CORE</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>LEARNING SURFACE ▮</span>
+        </div>
+        <h1 class="ix-title">
+          <span class="ix-title-line">THE AGENT</span>
+          <span class="ix-title-line ix-title-accent">THAT GROWS WITH YOU</span>
+        </h1>
+        <p class="ix-tag">
+          A reference companion for <a href="https://github.com/NousResearch/hermes-agent" class="ix-inline-link">Hermes Agent</a> by NousResearch.
+        </p>
+        <p class="ix-subtag">
+          Three free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
+        </p>
+      </section>
+
+      <section class="ix-strip-banner">
+        <span>▮ THREE FREE SURFACES — CHEATSHEET · MASTER CLASS · FOUNDATION RELEASE ▮</span>
+      </section>
+
+      <section class="ix-grid" aria-label="Learning surfaces">
+        <a href={`${base}/cheatsheet/hermes-agent/`} class="ix-card ix-card-gold">
+          <div class="ix-card-h">
+            <span class="ix-card-n">01</span>
+            <span class="ix-card-title">Cheatsheet</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            Every <code>hermes</code> CLI command, global flag, slash command, and hook event — one dense page. <b>Bookmark and grep.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>40+ commands</span><span>·</span><span>15 hook events</span><span>·</span><span>printable</span>
+          </div>
+        </a>
+
+        <a href={`${base}/masterclass/hermes-agent/`} class="ix-card ix-card-amber">
+          <div class="ix-card-h">
+            <span class="ix-card-n">02</span>
+            <span class="ix-card-title">Master Class</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            The mental model: session flow, <code>SOUL.md</code> &middot; <code>MEMORY.md</code> &middot; <code>USER.md</code>, hooks, peers, profiles. <b>Start here if you're new.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>6 modules</span><span>·</span><span>~30 min</span><span>·</span><span>printable</span>
+          </div>
+        </a>
+
+        <a href={`${base}/foundation-release/`} class="ix-card ix-card-bronze">
+          <div class="ix-card-h">
+            <span class="ix-card-n">03</span>
+            <span class="ix-card-title">Foundation Release</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            v{HERMES_VERSION} ({HERMES_TAG}) capability digest — PyPI install, lazy-install debloat, Grok 1M, OpenAI proxy, Teams, LSP per write. <b>Catch up in 10 minutes.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>808 commits</span><span>·</span><span>633 PRs</span><span>·</span><span>215 contributors</span>
+          </div>
+        </a>
+      </section>
+
+      <section class="ix-about">
+        <h2 class="ix-about-h">▸ ABOUT HERMES-CORE</h2>
+        <p class="ix-about-p">
+          Three free reference surfaces for <a href="https://hermes-agent.nousresearch.com/docs/" rel="noopener">Hermes Agent</a> — the open-source agent CLI from <a href="https://nousresearch.com/" rel="noopener">NousResearch</a> with the tagline <i>the agent that grows with you</i>. Built as a community/fan project sibling to <a href="https://github.com/cfpperche/claude-core" rel="noopener">claude-core</a>.
+        </p>
+        <p class="ix-about-p">
+          Hermes Agent itself, the NousResearch trademark, and the <code>hermes-agent.nousresearch.com</code> documentation are property of NousResearch. Color palette and typographic motifs in this site are drawn from Hermes's own <code>hermes_cli/banner.py</code>.
+        </p>
+        <p class="ix-about-p">
+          Source &amp; issues: <a href="https://github.com/cfpperche/hermes-core" rel="noopener">github.com/cfpperche/hermes-core</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="ix-foot">
+      <span class="ix-foot-tag">▮ MIT · {new Date().getFullYear()} · static site, no analytics ▮</span>
+    </footer>
+
+    <style is:global>
+      .ix-body {
+        background: var(--color-bg);
+        color: var(--color-fg);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ix-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 2rem;
+        border-bottom: 1px solid var(--color-bronze);
+        background: var(--color-surface);
+      }
+
+      .ix-mark {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: var(--font-display);
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        color: var(--color-gold);
+      }
+
+      .ix-caduceus {
+        font-size: 1.5rem;
+        line-height: 1;
+      }
+
+      .ix-mark-text {
+        font-size: 1.05rem;
+      }
+
+      .ix-nav {
+        display: flex;
+        gap: 1.5rem;
+      }
+
+      .ix-nav-link {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.06em;
+        color: var(--color-fg-dim);
+        text-transform: lowercase;
+      }
+      .ix-nav-link:hover {
+        color: var(--color-gold);
+      }
+
+      .ix-main {
+        flex: 1;
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 3rem 2rem;
+        width: 100%;
+      }
+
+      .ix-hero {
+        text-align: center;
+        margin-bottom: 3rem;
+      }
+
+      .ix-strip {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        color: var(--color-bronze);
+        text-transform: uppercase;
+        margin-bottom: 2rem;
+      }
+
+      .ix-title {
+        font-family: var(--font-display);
+        font-weight: 900;
+        line-height: 1.05;
+        font-size: clamp(2.5rem, 6vw, 5rem);
+        margin: 0 0 1.25rem;
+        letter-spacing: -0.02em;
+      }
+
+      .ix-title-line {
+        display: block;
+        color: var(--color-fg);
+      }
+
+      .ix-title-accent {
+        color: var(--color-gold);
+        font-style: italic;
+      }
+
+      .ix-tag {
+        font-size: 1.15rem;
+        color: var(--color-fg);
+        margin: 1rem 0 0.5rem;
+        max-width: 36rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .ix-inline-link {
+        color: var(--color-amber);
+        border-bottom: 1px dotted var(--color-amber);
+      }
+
+      .ix-subtag {
+        font-size: 0.9rem;
+        color: var(--color-fg-dim);
+      }
+      .ix-subtag code {
+        color: var(--color-amber);
+      }
+
+      .ix-strip-banner {
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.18em;
+        color: var(--color-gold);
+        background: var(--color-surface);
+        border-top: 1px solid var(--color-bronze);
+        border-bottom: 1px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        margin-bottom: 3rem;
+      }
+
+      .ix-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 3.5rem;
+      }
+
+      .ix-card {
+        --ix-c: var(--color-gold);
+        display: block;
+        padding: 1.5rem 1.5rem 1.25rem;
+        background: var(--color-surface);
+        border: 1px solid var(--ix-c);
+        border-left-width: 4px;
+        transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+      }
+
+      .ix-card:hover {
+        transform: translateY(-2px);
+        background: var(--color-surface-mid);
+      }
+
+      .ix-card-gold   { --ix-c: var(--color-gold); }
+      .ix-card-amber  { --ix-c: var(--color-amber); }
+      .ix-card-bronze { --ix-c: var(--color-bronze); }
+
+      .ix-card-h {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .ix-card-n {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.1em;
+      }
+
+      .ix-card-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.45rem;
+        color: var(--ix-c);
+        flex: 1;
+      }
+
+      .ix-card-arr {
+        color: var(--ix-c);
+        font-size: 1.2rem;
+      }
+
+      .ix-card-desc {
+        font-size: 0.95rem;
+        color: var(--color-fg);
+        line-height: 1.55;
+        margin: 0 0 0.85rem;
+      }
+      .ix-card-desc code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+      .ix-card-desc b {
+        color: var(--color-gold);
+        font-weight: 600;
+      }
+
+      .ix-card-meta {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .ix-about {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding-top: 2rem;
+        border-top: 1px solid var(--color-bronze);
+      }
+
+      .ix-about-h {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.15em;
+        color: var(--color-bronze);
+        margin: 0 0 1rem;
+      }
+
+      .ix-about-p {
+        font-size: 0.95rem;
+        color: var(--color-fg);
+        line-height: 1.65;
+        margin: 0 0 1rem;
+      }
+      .ix-about-p code {
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+      .ix-about-p a {
+        color: var(--color-amber);
+        border-bottom: 1px dotted var(--color-amber);
+      }
+      .ix-about-p i {
+        color: var(--color-fg);
+        font-style: italic;
+      }
+
+      .ix-foot {
+        text-align: center;
+        padding: 1.5rem;
+        border-top: 1px solid var(--color-bronze);
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.15em;
+        color: var(--color-bronze);
+      }
+
+      @media (max-width: 640px) {
+        .ix-top {
+          flex-direction: column;
+          gap: 0.85rem;
+          padding: 1rem;
+        }
+        .ix-main {
+          padding: 2rem 1rem;
+        }
+      }
+    </style>
+  </body>
+</html>

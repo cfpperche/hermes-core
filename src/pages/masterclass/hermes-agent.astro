@@ -1,0 +1,384 @@
+---
+import "../../styles/global.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+
+const pageTitle = `Hermes Agent · Master Class · v${HERMES_VERSION}`;
+const pageDesc = `The mental model behind Hermes Agent — session flow, SOUL.md, MEMORY.md, USER.md, hooks lifecycle, peers (Honcho), profiles. Six-module guided walkthrough.`;
+
+const modules = [
+  { n: 1, slug: "session-flow", title: "The session flow",            tag: "foundations" },
+  { n: 2, slug: "identity",     title: "Identity files: SOUL, MEMORY, USER", tag: "context"     },
+  { n: 3, slug: "tools",        title: "Tools, plugins, MCP",         tag: "extension"   },
+  { n: 4, slug: "hooks",        title: "Hooks lifecycle",             tag: "extension"   },
+  { n: 5, slug: "peers",        title: "Peers and memory providers",  tag: "memory"      },
+  { n: 6, slug: "coordination", title: "Profiles, sub-agents, Kanban",tag: "scale"       },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/masterclass/hermes-agent/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <nav class="hc-nav">
+        <a href={`${base}/cheatsheet/hermes-agent/`}>cheatsheet</a>
+        <span class="hc-here">master class</span>
+        <a href={`${base}/foundation-release/`}>foundation release</a>
+      </nav>
+    </header>
+
+    <main class="mc-page">
+      <section class="mc-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · MASTER CLASS</span>
+          <span>HERMES AGENT v{HERMES_VERSION}</span>
+          <span>6 MODULES · ~30 MIN ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">THE MENTAL</span>
+          <span class="hc-title-line hc-title-accent">MODEL</span>
+        </h1>
+        <p class="hc-tag">SESSION FLOW · IDENTITY · TOOLS · HOOKS · PEERS · SCALE</p>
+        <p class="hc-subtag">
+          Six modules from "what is Hermes" to "running parallel profiles". TL;DR-first. Built against <code>v{HERMES_VERSION}</code>.
+        </p>
+      </section>
+
+      <!-- TOC -->
+      <section class="mc-toc">
+        <h2 class="mc-toc-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="mc-toc-list">
+          {modules.map((m) => (
+            <li>
+              <a href={`#m${m.n}`}>
+                <span class="mc-toc-n">{String(m.n).padStart(2, "0")}</span>
+                <span class="mc-toc-title">{m.title}</span>
+                <span class="mc-toc-tag">{m.tag}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <!-- MODULE 1 -->
+      <section id="m1" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">01</span>
+          <h2>The session flow</h2>
+          <span class="mc-mod-tag">foundations</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> Hermes loads config + identity files, builds a system prompt, runs a tool-calling loop, and snapshots to SQLite — resumable via <code>-c</code> or <code>-r</code>. The full flow has hook entry points at every step.</p>
+        <p>When you run <code>hermes</code>, the agent first loads <code>~/.hermes/config.yaml</code> (provider, toolsets, hooks, gateway settings). It then walks the current directory looking for context files — <code>AGENTS.md</code>, project <code>SOUL.md</code>, <code>.hermes.md</code>, and even <code>CLAUDE.md</code> / <code>.cursorrules</code> if present — and folds them into the system prompt.</p>
+        <p>The system prompt construction is layered. <code>SOUL.md</code> anchors personality at the top. <code>MEMORY.md</code> (agent facts, 2,200 char limit) and <code>USER.md</code> (user profile, 1,375 char limit) inject as frozen snapshots — they reflect the file content as it was when the session opened. If an external memory provider is configured (Honcho, Mem0, Hindsight, Holographic, …), its dialectic context is layered in too.</p>
+        <p>From there the interaction loop runs. Each tool call passes through <code>pre_tool_call</code> → execution → <code>post_tool_call</code>. Each LLM turn passes through <code>pre_llm_call</code> → tool loop → <code>post_llm_call</code>. Session state persists to <code>~/.hermes/state.db</code> (SQLite) on every turn — durable enough to survive a crash, light enough to scan with <code>hermes sessions list</code>.</p>
+        <p>Resumption is symmetric: <code>hermes -c</code> grabs the most recent session in the working directory; <code>hermes -r &lt;id|title&gt;</code> picks a specific one. The memory and identity files are re-read on each start — so edits between sessions take effect on the <i>next</i> session, never the current one.</p>
+      </section>
+
+      <!-- MODULE 2 -->
+      <section id="m2" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">02</span>
+          <h2>Identity files: SOUL, MEMORY, USER</h2>
+          <span class="mc-mod-tag">context</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> Three files shape every Hermes session: <code>SOUL.md</code> = personality, <code>MEMORY.md</code> = agent facts, <code>USER.md</code> = user profile. Strict char limits. Manage with the <code>memory</code> tool, override per-session with <code>/personality</code>.</p>
+        <div class="mc-grid-2">
+          <article class="mc-card mc-card-gold">
+            <h3>SOUL.md</h3>
+            <p><code>~/.hermes/SOUL.md</code></p>
+            <p>Global personality definition. First content in the system prompt. Override per-session via <code>/personality &lt;preset&gt;</code>. Project-local <code>SOUL.md</code> at the working directory root takes precedence when present.</p>
+          </article>
+          <article class="mc-card mc-card-amber">
+            <h3>MEMORY.md</h3>
+            <p><code>~/.hermes/memories/MEMORY.md</code> · <b>2,200 char limit</b></p>
+            <p>Agent factual memory: environment, conventions, learned insights. Always present in context. Managed via the <code>memory</code> tool (<code>add</code> / <code>replace</code> / <code>remove</code>) — no <code>read</code> action because it's always loaded.</p>
+          </article>
+          <article class="mc-card mc-card-bronze">
+            <h3>USER.md</h3>
+            <p><code>~/.hermes/memories/USER.md</code> · <b>1,375 char limit</b></p>
+            <p>User profile: identity, preferences, communication style. Same lifecycle and <code>memory</code>-tool surface as <code>MEMORY.md</code>. Tighter cap because the value-per-token is lower.</p>
+          </article>
+          <article class="mc-card mc-card-teal">
+            <h3>AGENTS.md (project)</h3>
+            <p>Working directory root</p>
+            <p>Project-specific architecture, conventions, and coding style. Auto-discovered. The right place for "we use tabs, our test command is <code>pytest -x</code>, the auth module is in <code>src/auth/</code>" — anything you'd want said up front every session.</p>
+          </article>
+        </div>
+        <p class="mc-note"><b>Discipline.</b> Don't churn <code>SOUL.md</code> or <code>AGENTS.md</code> mid-project — stable system prompts mean cache hits, which means cheaper and faster turns. The skills system is the right place for procedural recipes; identity files are for <i>what</i>, not <i>how</i>.</p>
+      </section>
+
+      <!-- MODULE 3 -->
+      <section id="m3" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">03</span>
+          <h2>Tools, plugins, MCP</h2>
+          <span class="mc-mod-tag">extension</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> Built-in tools cover web / terminal / file edit / memory / subagent / browser / code-exec / image / TTS. Custom tools register through plugins. MCP servers plug in both directions — Hermes can host or consume.</p>
+        <p>The built-in toolset is intentionally broad: web search, terminal execution, file editing, memory management, subagent delegation (default 3 concurrent), browser automation (Browserbase, Browser Use, CDP, Chromium), sandboxed Python code execution, FAL.ai image generation across 9 models, and 10 voice/TTS providers. Most users never need to leave this set.</p>
+        <p>Plugins are the extension surface. Six categories cover the full vertical: general (tools, hooks, slash commands, CLI subcommands), model provider (new LLM backends), platform adapters (gateway channels), memory providers, context engines (message compression strategies), and image/video generation backends. Registration happens in a plugin's <code>__init__.py</code>:</p>
+        <pre class="mc-code"><code>{`def register(ctx):
+    ctx.register_tool(
+        name="calculate",
+        schema=SCHEMA,
+        handler=tools.calculate
+    )
+    ctx.register_hook("post_tool_call", my_hook_handler)
+    ctx.register_cli_command(name="mycmd", handler_fn=my_handler)`}</code></pre>
+        <p>MCP works both ways. <code>hermes mcp serve</code> exposes Hermes itself as an MCP server — other agents (Claude Code, Cursor, Continue) can call its tools. <code>hermes mcp add &lt;name&gt;</code> attaches an external MCP server as a tool source. The same plumbing underlies <code>hermes acp</code>, which speaks ACP for editor integrations like Zed.</p>
+      </section>
+
+      <!-- MODULE 4 -->
+      <section id="m4" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">04</span>
+          <h2>Hooks lifecycle</h2>
+          <span class="mc-mod-tag">extension</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> 15 hook events across 3 hook systems (shell, plugin, gateway). Shell hooks talk JSON on stdin/stdout. Each <code>(event, command)</code> pair prompts on first use and is allowlisted in <code>~/.hermes/shell-hooks-allowlist.json</code>.</p>
+        <p>Three coexisting hook registration mechanisms. <b>Shell hooks</b> declare in <code>~/.hermes/config.yaml</code> under a <code>hooks:</code> block — useful for audit logging, security gates, and context injection without writing Python. <b>Plugin hooks</b> register via <code>ctx.register_hook(event, handler)</code> inside a plugin — useful when the logic wants access to plugin state. <b>Gateway hooks</b> live in <code>~/.hermes/hooks/&lt;name&gt;/</code> bundles with a <code>HOOK.yaml</code> + <code>handler.py</code> — used by messaging platforms only.</p>
+        <p>The 15 events split into three classes. <b>Tool-call gates:</b> <code>pre_tool_call</code> (can block), <code>post_tool_call</code>, <code>transform_tool_result</code> (can rewrite), <code>transform_terminal_output</code> (can rewrite). <b>LLM-call gates:</b> <code>pre_llm_call</code> (can inject context), <code>post_llm_call</code>, <code>transform_llm_output</code> (can rewrite the final response text). <b>Lifecycle events:</b> <code>on_session_start</code>, <code>on_session_end</code>, <code>on_session_finalize</code>, <code>on_session_reset</code>, <code>subagent_stop</code>, plus three gateway-only events for messaging dispatch and approval flow.</p>
+        <p>Shell hook protocol: stdin receives JSON with <code>hook_event_name</code>, <code>tool_name</code>, <code>tool_input</code>, <code>session_id</code>, <code>cwd</code>. Stdout may return <code>&#123;"decision": "block", "reason": "..."&#125;</code> to block, or <code>&#123;"context": "injected text"&#125;</code> to inject. Non-zero exits log a warning but never crash the agent — the safety posture is "broken hook degrades to no-op, never to lock-out".</p>
+        <p>First-use consent is the key safety primitive. The first time a given <code>(event, command)</code> pair fires, Hermes asks for approval and persists the decision to <code>~/.hermes/shell-hooks-allowlist.json</code>. Bypass via <code>--accept-hooks</code> or <code>HERMES_ACCEPT_HOOKS=1</code> for CI environments where the prompts would block.</p>
+      </section>
+
+      <!-- MODULE 5 -->
+      <section id="m5" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">05</span>
+          <h2>Peers and memory providers</h2>
+          <span class="mc-mod-tag">memory</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> External memory providers persist context across sessions. Honcho is the canonical default — it models the user AND the agent as peers, runs dialectic reasoning passes, and refreshes context in two layers (base + dialectic supplement).</p>
+        <p>Identity files (<code>SOUL.md</code>, <code>MEMORY.md</code>, <code>USER.md</code>) cover within-session and across-session-on-this-machine knowledge. Memory providers add a <i>cross-session, cross-machine, semantic</i> layer. Eight integrations ship out of the box: Honcho, OpenViking (ByteDance), Mem0, Hindsight (knowledge-graph), Holographic (local SQLite/HRR), RetainDB (hybrid Vector+BM25), ByteRover (local-first), Supermemory. Configure via <code>hermes memory setup</code>.</p>
+        <p>Honcho is worth understanding even if you ultimately pick another provider, because its model shapes how the rest think about the problem. In Honcho, both the user and the agent get "peer" representations. Multiple Hermes instances (a coding profile and a personal-assistant profile, say) each maintain isolated peer profiles — no cross-contamination. After each turn, Honcho runs 1–3 dialectic reasoning passes, synthesising insights about the user's patterns over time.</p>
+        <p>Context injection is two-layer. The <b>base context</b> (session summary + peer cards) refreshes per <code>contextCadence</code>. The <b>dialectic supplement</b> (LLM-synthesized reasoning about user behavior) refreshes per <code>dialecticCadence</code>. The cadences are tunable — the trade is freshness vs token cost vs cache-warmth. Most users settle at "base every turn, dialectic every 5–10 turns".</p>
+        <p>Pick by use case. Honcho for multi-agent dialectic. Hindsight for knowledge-graph entity recall. Holographic for fully local, no-external-dep setups (HRR vectors in SQLite — surprising performance). Mem0 if you're already on its stack elsewhere. Choosing memory is a deliberate architectural decision, not a passive accumulation — the community's biggest failure mode is "I installed three memory providers and now I don't know which one knows what".</p>
+      </section>
+
+      <!-- MODULE 6 -->
+      <section id="m6" class="mc-mod">
+        <header class="mc-mod-h">
+          <span class="mc-mod-n">06</span>
+          <h2>Profiles, sub-agents, Kanban</h2>
+          <span class="mc-mod-tag">scale</span>
+        </header>
+        <p class="mc-tldr"><b>TL;DR.</b> Profiles are fully isolated Hermes instances. Sub-agents fork the current session for parallel work (default 3 concurrent). <code>hermes kanban</code> coordinates work across profiles via a multi-board state machine.</p>
+        <p>A profile is a separate Hermes universe — its own <code>~/.hermes/</code> equivalent, its own config, memory, skills, sessions, gateway, allowlist. Use cases: one profile per project domain (coding / research / ops), one profile per organisation if you contract for multiple clients, one profile for "test things I might want to break" so the canonical state stays clean. Manage with <code>hermes profile &lt;list|create|delete|clone|rename|export|import&gt;</code>; switch with the global <code>--profile/-p</code> flag.</p>
+        <p>Within a profile, sub-agents handle parallel work. The agent can delegate a self-contained task to a child via the built-in subagent tool — the child runs in its own context, returns a summary, and the parent continues. Default concurrency is 3 — enough to parallelise without blowing context. Sub-agent lifecycle fires <code>subagent_stop</code> when a child exits, useful for logging or chaining.</p>
+        <p><code>hermes kanban</code> raises the abstraction. The Kanban board is a multi-profile coordination surface — you can <code>create</code> tasks, <code>assign</code> them to profiles, <code>dispatch</code> them as live work, and <code>decompose</code> a big task into smaller ones across profiles. State persists in the gateway's database; visualise via <code>hermes dashboard</code>. The combination of profiles + sub-agents + Kanban is how a single human runs what looks like a small team.</p>
+        <p>One caution: every layer multiplies the trust surface. Profile A's memory should not leak to Profile B, and sub-agents should not silently inherit dangerous permissions. Use Docker terminal backend (<code>TERMINAL_BACKEND=docker</code>) for untrusted code, never set <code>GATEWAY_ALLOW_ALL_USERS=true</code> with terminal-capable bots, and start every approval at "session" scope before promoting to "always".</p>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · MASTER CLASS · 6 MODULES · MIT ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .mc-page {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .mc-banner {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .mc-toc {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 3rem;
+      }
+      .mc-toc-h {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.15em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+        margin: 0 0 0.85rem;
+      }
+      .mc-toc-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.4rem;
+      }
+      .mc-toc-list a {
+        display: flex;
+        align-items: baseline;
+        gap: 0.85rem;
+        padding: 0.45rem 0.6rem;
+        border-left: 2px solid transparent;
+        font-size: 0.92rem;
+      }
+      .mc-toc-list a:hover {
+        background: var(--color-surface-mid);
+        border-left-color: var(--color-gold);
+      }
+      .mc-toc-n {
+        font-family: var(--font-mono);
+        color: var(--color-fg-dim);
+        font-size: 0.78rem;
+        min-width: 1.5rem;
+      }
+      .mc-toc-title {
+        font-family: var(--font-display);
+        color: var(--color-fg);
+        flex: 1;
+      }
+      .mc-toc-tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--color-bronze);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .mc-mod {
+        margin-bottom: 3.5rem;
+      }
+      .mc-mod-h {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding-bottom: 0.6rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--color-bronze);
+      }
+      .mc-mod-h h2 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.65rem;
+        color: var(--color-gold);
+        margin: 0;
+        flex: 1;
+      }
+      .mc-mod-n {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        color: var(--color-bronze);
+        background: var(--color-surface);
+        padding: 0.2rem 0.55rem;
+        border: 1px solid var(--color-bronze);
+      }
+      .mc-mod-tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .mc-mod p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 1rem;
+        font-size: 0.98rem;
+      }
+      .mc-mod p code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.88em;
+      }
+      .mc-mod p b {
+        color: var(--color-gold);
+      }
+      .mc-mod p i {
+        color: var(--color-fg-dim);
+      }
+      .mc-tldr {
+        background: var(--color-surface);
+        border-left: 3px solid var(--color-gold);
+        padding: 0.85rem 1rem;
+        font-size: 0.95rem !important;
+      }
+
+      .mc-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        gap: 0.85rem;
+        margin: 1rem 0;
+      }
+      .mc-card {
+        --mc-c: var(--color-gold);
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--mc-c);
+        padding: 1rem 1.1rem;
+      }
+      .mc-card h3 {
+        font-family: var(--font-display);
+        color: var(--mc-c);
+        margin: 0 0 0.4rem;
+        font-size: 1.1rem;
+      }
+      .mc-card p {
+        font-size: 0.88rem !important;
+        margin-bottom: 0.5rem !important;
+      }
+      .mc-card p:last-child { margin-bottom: 0 !important; }
+      .mc-card-gold   { --mc-c: var(--color-gold); }
+      .mc-card-amber  { --mc-c: var(--color-amber); }
+      .mc-card-bronze { --mc-c: var(--color-bronze); }
+      .mc-card-teal   { --mc-c: var(--color-teal); }
+
+      .mc-note {
+        background: var(--color-surface);
+        border-left: 3px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        font-size: 0.92rem !important;
+        color: var(--color-fg-dim) !important;
+      }
+      .mc-note b {
+        color: var(--color-gold);
+      }
+
+      .mc-code {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: var(--color-fg);
+        overflow-x: auto;
+        margin: 0.5rem 0 1rem;
+        line-height: 1.55;
+      }
+      .mc-code code {
+        background: transparent;
+        padding: 0;
+        color: inherit;
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #ffffff;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .mc-mod { break-inside: avoid; }
+      }
+    </style>
+  </body>
+</html>

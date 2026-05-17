@@ -1,0 +1,409 @@
+---
+import "../styles/global.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+const RELEASE_DATE = "May 16, 2026";
+
+const pageTitle = `Hermes Agent · Foundation Release · v${HERMES_VERSION}`;
+const pageDesc = `Capability digest for Hermes Agent v${HERMES_VERSION} (${HERMES_TAG}, ${RELEASE_DATE}) — PyPI install, lazy-install debloat, xAI Grok 1M, OpenAI-compatible local proxy, Microsoft Teams full stack, LSP semantic diagnostics per write.`;
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/foundation-release/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <nav class="hc-nav">
+        <a href={`${base}/cheatsheet/hermes-agent/`}>cheatsheet</a>
+        <a href={`${base}/masterclass/hermes-agent/`}>master class</a>
+        <span class="hc-here">foundation release</span>
+      </nav>
+    </header>
+
+    <main class="fr-page">
+      <section class="fr-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · FOUNDATION RELEASE</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>{RELEASE_DATE} ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">THE FOUNDATION</span>
+          <span class="hc-title-line hc-title-accent">RELEASE</span>
+        </h1>
+        <p class="hc-tag">PYPI · LAZY-INSTALL · GROK 1M · PROXY · TEAMS · LSP</p>
+        <p class="hc-subtag">
+          NousResearch shipped {HERMES_TAG} on {RELEASE_DATE} — the largest single release in Hermes Agent's history. <i>"Installs and runs anywhere, ships with the things you actually want to use, and stops shipping the things you don't."</i>
+        </p>
+      </section>
+
+      <!-- BY THE NUMBERS -->
+      <section class="fr-stats">
+        <h2 class="fr-h2">▸ BY THE NUMBERS</h2>
+        <div class="fr-stats-grid">
+          <div class="fr-stat"><span class="fr-stat-n">808</span><span class="fr-stat-l">commits</span></div>
+          <div class="fr-stat"><span class="fr-stat-n">633</span><span class="fr-stat-l">PRs merged</span></div>
+          <div class="fr-stat"><span class="fr-stat-n">1,393</span><span class="fr-stat-l">files changed</span></div>
+          <div class="fr-stat"><span class="fr-stat-n">165k</span><span class="fr-stat-l">insertions</span></div>
+          <div class="fr-stat"><span class="fr-stat-n">545</span><span class="fr-stat-l">issues closed</span></div>
+          <div class="fr-stat"><span class="fr-stat-n">215</span><span class="fr-stat-l">contributors</span></div>
+        </div>
+      </section>
+
+      <!-- HEADLINE THEMES -->
+      <section class="fr-themes">
+        <h2 class="fr-h2">▸ SIX HEADLINE THEMES</h2>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">01</span>
+            <h3>Install anywhere — PyPI + lazy backends</h3>
+          </header>
+          <p>Install is now a single line:</p>
+          <pre class="mc-code"><code>{`pip install hermes-agent
+hermes`}</code></pre>
+          <p>The bigger shift is what's <i>not</i> shipped at install time. Heavy backends — Slack, Matrix, Feishu, DingTalk, Hindsight, Codex app-server, Pixverse, Camofox, image generation, voice/TTS — install <b>lazily on first use</b>. Cold startup drops ~19 seconds (deferred imports + parallel init), and browser tool evaluations run 180× faster via persistent Chrome DevTools Protocol connections.</p>
+          <p>Native Windows support is early-beta — <code>cmd.exe</code> and PowerShell, no WSL, automated MinGit, proper Windows signal handling. Android / Termux is documented as a supported install target.</p>
+        </article>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">02</span>
+            <h3>xAI Grok joins as a first-class provider</h3>
+          </header>
+          <p>Two auth paths. OAuth for SuperGrok subscribers — pick "xAI Grok OAuth (SuperGrok Subscription)" in <code>hermes model</code>, or run <code>hermes auth add xai-oauth</code>. API-key fallback: set <code>XAI_API_KEY</code> in <code>~/.hermes/.env</code>. Grok 4 models route automatically to the Responses API for reasoning support.</p>
+          <p><code>grok-4.3</code> ships with a <b>1M token context window</b> in this release. Prompt caching is automatic via <code>x-grok-conv-id</code> header routing — requests in the same session land on the same server for cache hits. No manual config.</p>
+          <p>Side note: Alibaba Cloud is being rebranded to Qwen Cloud. Existing configs using <code>alibaba</code> as the provider ID continue to work. <code>DASHSCOPE_API_KEY</code> stays as the env var. A separate Qwen Portal OAuth path is also live.</p>
+          <p>Cross-session Claude prompt caching now persists for <b>1 hour across sessions</b> — previously per-session only. No config change required for Anthropic / OpenRouter / Nous Portal users.</p>
+        </article>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">03</span>
+            <h3>OpenAI-compatible local proxy</h3>
+          </header>
+          <p>Run <code>hermes proxy</code> and any OpenAI-shaped client — <b>Codex CLI, Aider, Cline, Continue</b>, Open WebUI, LobeChat, LibreChat, AnythingLLM, NextChat, ChatBox, Jan — can talk to your OAuth-authenticated Hermes providers (Claude Pro, ChatGPT Pro, SuperGrok) without API keys.</p>
+          <p>Endpoint defaults to <code>http://localhost:8642/v1</code>. Exposed surface:</p>
+          <ul class="fr-list">
+            <li><code>POST /v1/chat/completions</code> — standard streaming / non-streaming chat</li>
+            <li><code>POST /v1/responses</code> — Responses API with server-side conversation state (<code>previous_response_id</code> for multi-turn)</li>
+            <li><code>GET /v1/models</code> · <code>GET /v1/capabilities</code> — discovery</li>
+            <li><code>POST /v1/runs</code> · <code>GET /v1/runs/&#123;id&#125;</code> · <code>/events</code> · <code>/stop</code> — Runs API for long-form agent sessions with SSE</li>
+            <li><code>GET /health</code> · <code>GET /health/detailed</code> — health with resource metrics</li>
+          </ul>
+          <p>Configure the embedded API server via <code>~/.hermes/.env</code>:</p>
+          <pre class="mc-code"><code>{`API_SERVER_ENABLED=true        # default: false
+API_SERVER_PORT=8642
+API_SERVER_HOST=127.0.0.1      # loopback by default
+API_SERVER_KEY=<token>         # required for non-loopback bind
+API_SERVER_CORS_ORIGINS=<origins>`}</code></pre>
+          <p class="mc-note"><b>Why this is interesting.</b> It is the inverse of routing proxies like CCRouter: instead of routing Claude Code calls out to alternative providers, you route alternative-shaped clients <i>into</i> your existing OAuth subscriptions. Useful when you already pay for Claude Pro / SuperGrok and want every editor agent on your machine to use those credentials.</p>
+        </article>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">04</span>
+            <h3>Microsoft Teams — end-to-end</h3>
+          </header>
+          <p>Teams is the second major messaging integration after Slack. The stack is full Microsoft Graph: auth + client, webhook listener at <code>POST /api/messages</code>, pipeline plugin runtime, outbound delivery. Setup follows Microsoft's standard:</p>
+          <pre class="mc-code"><code>{`npm install -g @microsoft/teams.cli@preview
+teams login
+teams app create --name "Hermes" \\
+  --endpoint "https://<tunnel-url>/api/messages"
+# outputs CLIENT_ID, CLIENT_SECRET, TENANT_ID`}</code></pre>
+          <p>Drop those into <code>~/.hermes/.env</code>:</p>
+          <pre class="mc-code"><code>{`TEAMS_CLIENT_ID=<id>
+TEAMS_CLIENT_SECRET=<secret>
+TEAMS_TENANT_ID=<tenant>
+TEAMS_ALLOWED_USERS=<comma-separated AAD object IDs>
+TEAMS_PORT=3978`}</code></pre>
+          <p>Teams requires a public HTTPS endpoint for the webhook. Use devtunnel, ngrok, or cloudflared for local dev. Personal DMs respond to every message. Group / channel responses require an <code>@</code> mention — tags are stripped automatically. Approval prompts surface as Adaptive Cards with four buttons (Allow Once / Allow Session / Always Allow / Deny). Meeting summaries integrate via the Teams Meeting Pipeline.</p>
+          <p>LINE and SimpleX Chat also land in this release, bringing the supported messaging platform total to <b>22</b>.</p>
+        </article>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">05</span>
+            <h3>LSP semantic diagnostics per write</h3>
+          </header>
+          <p>This is the headline correctness feature. When the agent uses <code>write_file</code> or <code>patch</code>, Hermes runs a <b>real language server</b> against the edited file and surfaces any new errors back to the agent before the next turn. Not regex linting — full semantic analysis: type errors, undefined symbols, missing imports.</p>
+          <p>The v0.13 baseline was basic syntax-level checking for Python / JSON / YAML / TOML. v0.14 extends this to <i>actual</i> LSP semantic analysis across whichever language servers are installed on the host. The error path is the agent's own correction loop — the agent sees the diagnostic inline and self-corrects without a human round-trip.</p>
+          <p>A separate per-turn file-mutation verifier confirms each write actually completes correctly. Toggle via <code>HERMES_FILE_MUTATION_VERIFIER=0</code> or <code>display.file_mutation_verifier: true/false</code> in config.</p>
+        </article>
+
+        <article class="fr-theme">
+          <header class="fr-theme-h">
+            <span class="fr-theme-n">06</span>
+            <h3>Misc — but worth knowing</h3>
+          </header>
+          <ul class="fr-list">
+            <li><b><code>x_search</code></b> — first-class X / Twitter search tool. OAuth (via SuperGrok) or API key.</li>
+            <li><b><code>/handoff</code></b> — transfers an active session live to another model, persona, or profile without losing context. Every message, every tool call, every piece of state moves.</li>
+            <li><b><code>computer_use</code> works with non-Anthropic vision models.</b> New <code>cua-driver</code> backend, focus-safe operations included.</li>
+            <li><b>Clickable OSC8 hyperlinks</b> in agent output — real links with hover-highlight in modern terminals (kitty, iTerm2, WezTerm).</li>
+            <li><b>Unified <code>video_generate</code> tool.</b> Pluggable provider backends — new providers register as single-file plugins, no core changes.</li>
+            <li><b><code>HERMES_SESSION_ID</code></b> exposed to tools — session-aware tool behavior.</li>
+            <li><b><code>HERMES_PLUGINS_DEBUG=1</code></b> surfaces plugin discovery logs.</li>
+            <li><b>Security suite</b> — sudo brute-force blocking, expanded SSRF coverage, dangerous-command bypass closures, tool error sanitization (prompt-injection defence), supply-chain advisory during install, opt-in secret redaction (<code>security.redact_secrets: true</code>), Tirith terminal scanner integration (<code>tirith_enabled: true</code>).</li>
+            <li><b>Nine new optional skills</b> — Hyperliquid, Yahoo Finance, api-testing, unified EVM multi-chain, darwinian-evolver, osint-investigation, pinggy-tunnel, watchers, plus a major Notion overhaul.</li>
+          </ul>
+        </article>
+      </section>
+
+      <!-- MIGRATION -->
+      <section class="fr-migrate">
+        <h2 class="fr-h2">▸ MIGRATION FROM v0.13</h2>
+        <p>No dedicated "Breaking changes" section in the release notes — the migration is mostly automatic.</p>
+        <ul class="fr-list">
+          <li><b>Compression config migrates automatically.</b> Legacy <code>compression.summary_model</code> / <code>summary_provider</code> / <code>summary_base_url</code> move to <code>auxiliary.compression.*</code> on first load (config version 17). No action needed.</li>
+          <li><b>Compression structure splits into two blocks.</b> <code>compression:</code> for threshold / ratio / message limits / hygiene; <code>auxiliary.compression:</code> for model/provider selection / timeouts.</li>
+          <li><b>Tool progress display migrates automatically.</b> Legacy <code>display.tool_progress_overrides</code> moves to <code>display.platforms</code>; old format still loads.</li>
+          <li><b>Alibaba Cloud → Qwen Cloud.</b> Existing <code>alibaba</code> provider IDs keep working. Optional move.</li>
+          <li><b>Hot-reload now lands.</b> <code>model.context_length</code> and any <code>compression.*</code> change in <code>config.yaml</code> takes effect on the next message — no restart, no <code>/reset</code>, no session rotation.</li>
+        </ul>
+      </section>
+
+      <!-- WHERE TO DIG -->
+      <section class="fr-foot-grid">
+        <h2 class="fr-h2">▸ WHERE TO DIG</h2>
+        <div class="fr-grid-2">
+          <a class="fr-link-card" href="https://github.com/NousResearch/hermes-agent/releases/tag/v2026.5.16" rel="noopener">
+            <span class="fr-link-h">Full release notes</span>
+            <span class="fr-link-sub">github.com/NousResearch/hermes-agent · {HERMES_TAG}</span>
+          </a>
+          <a class="fr-link-card" href="https://hermes-agent.nousresearch.com/docs/" rel="noopener">
+            <span class="fr-link-h">Hermes Agent docs</span>
+            <span class="fr-link-sub">hermes-agent.nousresearch.com</span>
+          </a>
+          <a class="fr-link-card" href="https://hermes-agent.nousresearch.com/docs/reference/cli-commands" rel="noopener">
+            <span class="fr-link-h">Authoritative CLI reference</span>
+            <span class="fr-link-sub">auto-synced from source</span>
+          </a>
+          <a class="fr-link-card" href="https://github.com/0xNyk/awesome-hermes-agent" rel="noopener">
+            <span class="fr-link-h">awesome-hermes-agent</span>
+            <span class="fr-link-sub">community skills · memory backends · UIs</span>
+          </a>
+        </div>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · FOUNDATION RELEASE · v{HERMES_VERSION} · {RELEASE_DATE} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .fr-page {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+      .fr-banner {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+      .hc-subtag i {
+        color: var(--color-fg-dim);
+        font-style: italic;
+      }
+      .fr-h2 {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.18em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+        margin: 0 0 1.25rem;
+      }
+      .fr-stats {
+        margin-bottom: 3rem;
+      }
+      .fr-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        gap: 0.6rem;
+      }
+      .fr-stat {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--color-gold);
+        padding: 0.85rem 1rem;
+        text-align: center;
+      }
+      .fr-stat-n {
+        display: block;
+        font-family: var(--font-display);
+        font-weight: 900;
+        font-size: 1.75rem;
+        color: var(--color-gold);
+        line-height: 1.05;
+      }
+      .fr-stat-l {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.08em;
+        margin-top: 0.2rem;
+        text-transform: uppercase;
+      }
+
+      .fr-themes {
+        margin-bottom: 3rem;
+      }
+      .fr-theme {
+        margin-bottom: 2.5rem;
+      }
+      .fr-theme-h {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.85rem;
+        border-bottom: 1px solid var(--color-bronze);
+      }
+      .fr-theme-h h3 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.35rem;
+        color: var(--color-gold);
+        margin: 0;
+      }
+      .fr-theme-n {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--color-bronze);
+        background: var(--color-surface);
+        padding: 0.18rem 0.5rem;
+        border: 1px solid var(--color-bronze);
+      }
+      .fr-theme p {
+        color: var(--color-fg);
+        line-height: 1.7;
+        margin: 0 0 0.85rem;
+        font-size: 0.95rem;
+      }
+      .fr-theme p code, .fr-list code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.35rem;
+        color: var(--color-amber);
+        font-size: 0.86em;
+      }
+      .fr-theme p b, .fr-list b {
+        color: var(--color-gold);
+      }
+      .fr-theme p i {
+        color: var(--color-fg-dim);
+      }
+
+      .fr-list {
+        margin: 0;
+        padding-left: 1.4rem;
+        line-height: 1.65;
+        font-size: 0.93rem;
+      }
+      .fr-list li {
+        margin-bottom: 0.45rem;
+        color: var(--color-fg);
+      }
+
+      .fr-migrate {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 1.5rem 1.65rem;
+        margin-bottom: 3rem;
+      }
+      .fr-migrate .fr-h2 {
+        color: var(--color-amber);
+      }
+      .fr-migrate p {
+        color: var(--color-fg);
+        margin: 0 0 0.85rem;
+      }
+
+      .fr-foot-grid {
+        margin-bottom: 2rem;
+      }
+      .fr-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 0.6rem;
+      }
+      .fr-link-card {
+        display: block;
+        padding: 0.85rem 1rem;
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--color-gold);
+      }
+      .fr-link-card:hover {
+        background: var(--color-surface-mid);
+      }
+      .fr-link-h {
+        display: block;
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--color-gold);
+        font-size: 1rem;
+      }
+      .fr-link-sub {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--color-fg-dim);
+        margin-top: 0.2rem;
+      }
+
+      .mc-code {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 0.85rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        color: var(--color-fg);
+        overflow-x: auto;
+        margin: 0.4rem 0 1rem;
+        line-height: 1.55;
+      }
+      .mc-code code {
+        background: transparent;
+        padding: 0;
+        color: inherit;
+      }
+      .mc-note {
+        background: var(--color-bg);
+        border-left: 2px solid var(--color-bronze);
+        padding: 0.7rem 0.9rem;
+        font-size: 0.88rem;
+        color: var(--color-fg-dim);
+      }
+      .mc-note b {
+        color: var(--color-gold);
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #ffffff;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .fr-theme { break-inside: avoid; }
+      }
+    </style>
+  </body>
+</html>

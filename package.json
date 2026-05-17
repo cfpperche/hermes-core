@@ -1,0 +1,24 @@
+{
+  "name": "hermes-core",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "A learning surface for Hermes Agent (NousResearch): dense cheatsheet, Master Class on the mental model, and v0.14.0 Foundation Release reference.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.14.0",
+    "@astrojs/check": "^0.9.4",
+    "@tailwindcss/vite": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "@fontsource-variable/inter": "^5.1.1",
+    "@fontsource-variable/jetbrains-mono": "^5.1.1",
+    "@fontsource/playfair-display": "^5.1.1",
+    "typescript": "^5.7.0"
+  }
+}

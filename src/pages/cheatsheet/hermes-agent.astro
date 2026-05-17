@@ -1,0 +1,914 @@
+---
+import "../../styles/global.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Core Cheatsheet · v${HERMES_VERSION}`;
+const pageDesc = `One-page dense reference for Hermes Agent v${HERMES_VERSION}: 40+ CLI commands, global flags, slash commands, 15 hook events, memory limits, paths, env vars.`;
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/cheatsheet/hermes-agent/`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <nav class="hc-nav">
+        <a href={`${base}/masterclass/hermes-agent/`}>master class</a>
+        <a href={`${base}/foundation-release/`}>foundation release</a>
+        <span class="hc-here">cheatsheet</span>
+      </nav>
+    </header>
+
+    <main class="hc-page">
+      <!-- ===== BANNER ===== -->
+      <section class="hc-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · CHEATSHEET</span>
+          <span>HERMES AGENT v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>DENSE REFERENCE ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">HERMES AGENT</span>
+          <span class="hc-title-line hc-title-accent">CHEATSHEET</span>
+        </h1>
+        <p class="hc-tag">CLI · FLAGS · SLASH COMMANDS · HOOKS · MEMORY · CONFIG</p>
+        <p class="hc-subtag">
+          Every surface of <code>hermes</code> on one page. Built against <code>v{HERMES_VERSION}</code> ({HERMES_TAG}).
+        </p>
+      </section>
+
+      <!-- ===== HUB ===== -->
+      <section class="hc-hub">
+        <span class="hc-hub-h">▸ THE HERMES LEARNING SET</span>
+        <span class="hc-hub-here">you are here · cheatsheet <span class="hc-here-tag">(dense reference)</span></span>
+        <p class="hc-hub-intro">
+          Two companion surfaces deepen specific areas — pick by what you need next.
+        </p>
+        <div class="hc-hub-grid">
+          <a href={`${base}/masterclass/hermes-agent/`} class="hc-hub-card hc-hub-card-amber">
+            <div class="hc-hub-card-h">
+              <span class="hc-hub-card-n">01</span>
+              <span class="hc-hub-card-title">Master Class</span>
+              <span class="hc-hub-card-arr">↗</span>
+            </div>
+            <p class="hc-hub-card-desc">
+              Mental model: session flow, <code>SOUL.md</code>, <code>MEMORY.md</code>, hooks, peers, profiles.
+            </p>
+          </a>
+          <a href={`${base}/foundation-release/`} class="hc-hub-card hc-hub-card-bronze">
+            <div class="hc-hub-card-h">
+              <span class="hc-hub-card-n">02</span>
+              <span class="hc-hub-card-title">Foundation Release</span>
+              <span class="hc-hub-card-arr">↗</span>
+            </div>
+            <p class="hc-hub-card-desc">
+              v{HERMES_VERSION} digest — what changed, what's new, what to migrate.
+            </p>
+          </a>
+        </div>
+      </section>
+
+      <!-- ===== PART I HEADER ===== -->
+      <div class="hc-part">
+        <span class="hc-part-tag">PART I</span>
+        <span class="hc-part-h">CLI — the runtime surface</span>
+        <span class="hc-part-dim">commands, flags, slash shortcuts</span>
+      </div>
+
+      <section class="hc-grid">
+        <!-- GLOBAL FLAGS -->
+        <article class="hc-card hc-card-gold">
+          <h2 class="hc-card-h">▸ GLOBAL FLAGS</h2>
+          <p class="hc-card-sub">apply to any subcommand</p>
+          <dl class="hc-flags">
+            <dt><code>-p, --profile</code> <span class="hc-arg">&lt;name&gt;</span></dt>
+            <dd>Select active profile (isolated instance).</dd>
+            <dt><code>-r, --resume</code> <span class="hc-arg">&lt;session&gt;</span></dt>
+            <dd>Restore session by ID or title.</dd>
+            <dt><code>-c, --continue</code></dt>
+            <dd>Resume the most recent session in this dir.</dd>
+            <dt><code>-w, --worktree</code></dt>
+            <dd>Isolated git worktree for parallel workflows.</dd>
+            <dt><code>-z</code> <span class="hc-arg">"&lt;prompt&gt;"</span></dt>
+            <dd>Pure script mode: prompt in, text out, no UI.</dd>
+            <dt><code>--yolo</code></dt>
+            <dd>Bypass dangerous-command prompts. Use with care.</dd>
+            <dt><code>--ignore-rules</code></dt>
+            <dd>Skip auto-injection of rules / memory / skills.</dd>
+            <dt><code>--tui</code></dt>
+            <dd>Launch text UI.</dd>
+          </dl>
+        </article>
+
+        <!-- CHAT / SESSIONS -->
+        <article class="hc-card hc-card-amber">
+          <h2 class="hc-card-h">▸ CHAT &amp; SESSIONS</h2>
+          <p class="hc-card-sub">the conversation surface</p>
+          <dl class="hc-flags">
+            <dt><code>hermes</code> · <code>hermes chat</code></dt>
+            <dd>Interactive or one-shot conversation.</dd>
+            <dt><code>hermes -z "&lt;prompt&gt;"</code></dt>
+            <dd>Script mode — clean stdout, no UI chrome.</dd>
+            <dt><code>hermes sessions</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd>Subcommands: <code>list</code> · <code>browse</code> · <code>export</code> · <code>delete</code> · <code>prune</code> · <code>rename</code></dd>
+            <dt><code>hermes checkpoints</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>status</code> · <code>prune</code> · <code>clear</code> — rollback store mgmt.</dd>
+            <dt><code>hermes backup</code> <span class="hc-arg">[-o path]</span></dt>
+            <dd>Back up <code>~/.hermes</code> directory.</dd>
+            <dt><code>hermes import</code> <span class="hc-arg">&lt;zip&gt;</span></dt>
+            <dd>Restore from a backup.</dd>
+          </dl>
+        </article>
+
+        <!-- MODEL & AUTH -->
+        <article class="hc-card hc-card-bronze">
+          <h2 class="hc-card-h">▸ MODEL &amp; AUTH</h2>
+          <p class="hc-card-sub">which provider and how it signs in</p>
+          <dl class="hc-flags">
+            <dt><code>hermes setup</code> <span class="hc-arg">[section]</span></dt>
+            <dd>Interactive configuration wizard.</dd>
+            <dt><code>hermes model</code></dt>
+            <dd>Select default provider and model.</dd>
+            <dt><code>hermes fallback</code></dt>
+            <dd>Manage fallback provider chain.</dd>
+            <dt><code>hermes auth add</code> <span class="hc-arg">&lt;provider&gt;</span></dt>
+            <dd>e.g. <code>xai-oauth</code> · <code>anthropic</code> · <code>openai</code>.</dd>
+            <dt><code>hermes auth list</code></dt>
+            <dd>Show signed-in providers.</dd>
+            <dt><code>hermes proxy</code></dt>
+            <dd>Start OpenAI-compatible OAuth proxy (default port <code>8642</code>). Lets Codex / Aider / Cline talk to Claude Pro / SuperGrok without API keys.</dd>
+          </dl>
+        </article>
+
+        <!-- GATEWAY -->
+        <article class="hc-card hc-card-teal">
+          <h2 class="hc-card-h">▸ GATEWAY</h2>
+          <p class="hc-card-sub">messaging-platform integration</p>
+          <dl class="hc-flags">
+            <dt><code>hermes gateway run</code></dt>
+            <dd>Run gateway in foreground.</dd>
+            <dt><code>hermes gateway start</code></dt>
+            <dd>Start as a background service.</dd>
+            <dt><code>hermes gateway stop / restart / status</code></dt>
+            <dd>Service lifecycle.</dd>
+            <dt><code>hermes pairing</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>list</code> · <code>approve</code> · <code>revoke</code> — messaging access control.</dd>
+            <dt><code>hermes whatsapp</code> · <code>hermes slack</code></dt>
+            <dd>Per-platform bridge configuration.</dd>
+            <dt><code>hermes webhook</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>subscribe</code> · <code>list</code> · <code>remove</code> · <code>test</code> — dynamic webhooks.</dd>
+          </dl>
+        </article>
+      </section>
+
+      <section class="hc-grid">
+        <!-- TOOLS & PLUGINS -->
+        <article class="hc-card hc-card-gold">
+          <h2 class="hc-card-h">▸ TOOLS &amp; PLUGINS</h2>
+          <p class="hc-card-sub">what the agent can wield</p>
+          <dl class="hc-flags">
+            <dt><code>hermes tools</code> <span class="hc-arg">[--summary]</span></dt>
+            <dd>Configure platform-specific tools.</dd>
+            <dt><code>hermes plugins</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>install</code> · <code>update</code> · <code>remove</code> · <code>enable</code> · <code>disable</code> · <code>list</code>.</dd>
+            <dt><code>hermes mcp</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>serve</code> · <code>add</code> · <code>remove</code> · <code>list</code> · <code>test</code> · <code>configure</code> · <code>login</code>.</dd>
+            <dt><code>hermes mcp serve</code></dt>
+            <dd>Run Hermes itself as an MCP server.</dd>
+            <dt><code>hermes acp</code></dt>
+            <dd>Start as ACP stdio server for editor integration.</dd>
+            <dt><code>hermes computer-use install</code></dt>
+            <dd>Install CUA driver backend (now non-Anthropic models too).</dd>
+          </dl>
+        </article>
+
+        <!-- SKILLS -->
+        <article class="hc-card hc-card-amber">
+          <h2 class="hc-card-h">▸ SKILLS</h2>
+          <p class="hc-card-sub">reusable procedural recipes</p>
+          <dl class="hc-flags">
+            <dt><code>hermes skills browse</code></dt>
+            <dd>Open the registry browser.</dd>
+            <dt><code>hermes skills search</code> <span class="hc-arg">&lt;q&gt;</span></dt>
+            <dd>Search registries.</dd>
+            <dt><code>hermes skills install</code> <span class="hc-arg">&lt;id&gt;</span></dt>
+            <dd>Install a skill on demand.</dd>
+            <dt><code>hermes skills list</code></dt>
+            <dd>Show installed skills.</dd>
+            <dt><code>hermes skills publish</code></dt>
+            <dd>Publish your skill to a community registry.</dd>
+            <dt><code>hermes skills tap</code></dt>
+            <dd>Add a registry tap.</dd>
+            <dt><code>hermes curator</code></dt>
+            <dd>Background skill-maintenance daemon (v0.12+).</dd>
+          </dl>
+        </article>
+
+        <!-- MEMORY -->
+        <article class="hc-card hc-card-bronze">
+          <h2 class="hc-card-h">▸ MEMORY</h2>
+          <p class="hc-card-sub">cross-session knowledge layer</p>
+          <dl class="hc-flags">
+            <dt><code>hermes memory setup</code></dt>
+            <dd>Pick external memory provider.</dd>
+            <dt><code>hermes memory status</code></dt>
+            <dd>Show active provider, dialectic mode, peer state.</dd>
+            <dt><code>hermes memory off</code></dt>
+            <dd>Disable external memory provider.</dd>
+            <dt class="hc-dim">files (in <code>~/.hermes/memories/</code>)</dt>
+            <dd>
+              <code>MEMORY.md</code> — agent facts, <b>2,200 chars</b><br/>
+              <code>USER.md</code> — user profile, <b>1,375 chars</b><br/>
+              <code>SOUL.md</code> — global personality
+            </dd>
+            <dt class="hc-dim">providers</dt>
+            <dd>Honcho · OpenViking · Mem0 · Hindsight · Holographic · RetainDB · ByteRover · Supermemory</dd>
+          </dl>
+        </article>
+
+        <!-- COORDINATION -->
+        <article class="hc-card hc-card-teal">
+          <h2 class="hc-card-h">▸ COORDINATION</h2>
+          <p class="hc-card-sub">multi-profile, multi-task</p>
+          <dl class="hc-flags">
+            <dt><code>hermes profile</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>list</code> · <code>create</code> · <code>delete</code> · <code>clone</code> · <code>rename</code> · <code>export</code> · <code>import</code>.</dd>
+            <dt><code>hermes kanban</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>init</code> · <code>create</code> · <code>list</code> · <code>assign</code> · <code>dispatch</code> · <code>decompose</code> — multi-profile board.</dd>
+            <dt><code>hermes cron</code> <span class="hc-arg">&lt;sub&gt;</span></dt>
+            <dd><code>list</code> · <code>create</code> · <code>edit</code> · <code>pause</code> · <code>resume</code> · <code>run</code> · <code>remove</code>.</dd>
+            <dt><code>hermes dashboard</code> <span class="hc-arg">[--port N]</span></dt>
+            <dd>Web management UI.</dd>
+          </dl>
+        </article>
+      </section>
+
+      <section class="hc-grid">
+        <!-- HOOKS CLI -->
+        <article class="hc-card hc-card-gold">
+          <h2 class="hc-card-h">▸ HOOKS (CLI)</h2>
+          <p class="hc-card-sub">inspect, approve, debug</p>
+          <dl class="hc-flags">
+            <dt><code>hermes hooks list</code></dt>
+            <dd>Show registered hooks across all systems.</dd>
+            <dt><code>hermes hooks test</code> <span class="hc-arg">&lt;name&gt;</span></dt>
+            <dd>Dry-run a hook with a synthetic event payload.</dd>
+            <dt><code>hermes hooks revoke</code> <span class="hc-arg">&lt;event,cmd&gt;</span></dt>
+            <dd>Remove approval from the allowlist.</dd>
+            <dt><code>hermes hooks doctor</code></dt>
+            <dd>Diagnose misconfigured hooks.</dd>
+            <dt class="hc-dim">consent</dt>
+            <dd>Each <code>(event, command)</code> pair prompts on first use; persisted to <code>~/.hermes/shell-hooks-allowlist.json</code>.</dd>
+            <dt class="hc-dim">bypass</dt>
+            <dd><code>--accept-hooks</code> · <code>HERMES_ACCEPT_HOOKS=1</code> · <code>hooks_auto_accept: true</code> in config.</dd>
+          </dl>
+        </article>
+
+        <!-- DIAGNOSTICS -->
+        <article class="hc-card hc-card-amber">
+          <h2 class="hc-card-h">▸ DIAGNOSTICS &amp; LOGS</h2>
+          <p class="hc-card-sub">when something feels off</p>
+          <dl class="hc-flags">
+            <dt><code>hermes status</code> <span class="hc-arg">[--all] [--deep]</span></dt>
+            <dd>System health overview.</dd>
+            <dt><code>hermes doctor</code> <span class="hc-arg">[--fix]</span></dt>
+            <dd>Diagnose config / dependency issues.</dd>
+            <dt><code>hermes logs</code> <span class="hc-arg">[agent|errors|gateway] [-f]</span></dt>
+            <dd>View / tail log files.</dd>
+            <dt><code>hermes insights</code> <span class="hc-arg">[--days N]</span></dt>
+            <dd>Token / cost / activity analytics.</dd>
+            <dt><code>hermes dump</code> <span class="hc-arg">[--show-keys]</span></dt>
+            <dd>Copy-pasteable setup summary.</dd>
+            <dt><code>hermes debug share</code></dt>
+            <dd>Upload logs for support.</dd>
+          </dl>
+        </article>
+
+        <!-- CONFIG / LIFECYCLE -->
+        <article class="hc-card hc-card-bronze">
+          <h2 class="hc-card-h">▸ CONFIG &amp; LIFECYCLE</h2>
+          <p class="hc-card-sub">install, update, migrate</p>
+          <dl class="hc-flags">
+            <dt><code>hermes config show</code></dt>
+            <dd>Print effective config.</dd>
+            <dt><code>hermes config edit</code></dt>
+            <dd>Open in <code>$EDITOR</code>.</dd>
+            <dt><code>hermes config set</code> <span class="hc-arg">k=v</span></dt>
+            <dd>Targeted update.</dd>
+            <dt><code>hermes config check</code></dt>
+            <dd>Validate without applying.</dd>
+            <dt><code>hermes config migrate</code></dt>
+            <dd>Upgrade legacy config keys.</dd>
+            <dt><code>hermes update</code> <span class="hc-arg">[--check] [--backup]</span></dt>
+            <dd>Pull latest code.</dd>
+            <dt><code>hermes uninstall</code> <span class="hc-arg">[--full]</span></dt>
+            <dd>Remove from system.</dd>
+            <dt><code>hermes completion</code> <span class="hc-arg">&lt;shell&gt;</span></dt>
+            <dd><code>bash</code> · <code>zsh</code> · <code>fish</code></dd>
+          </dl>
+        </article>
+
+        <!-- INSTALL -->
+        <article class="hc-card hc-card-teal">
+          <h2 class="hc-card-h">▸ INSTALL</h2>
+          <p class="hc-card-sub">v0.14 simplified the picture</p>
+          <dl class="hc-flags">
+            <dt class="hc-dim">PyPI (recommended)</dt>
+            <dd>
+              <code>pip install hermes-agent</code><br/>
+              <code>hermes</code>
+            </dd>
+            <dt class="hc-dim">heavy backends</dt>
+            <dd>Slack · Matrix · Feishu · DingTalk · image-gen · Voice/TTS install <b>lazily on first use</b> — not at install time.</dd>
+            <dt class="hc-dim">windows</dt>
+            <dd>Native <code>cmd.exe</code> / PowerShell support (early beta) — no WSL.</dd>
+            <dt class="hc-dim">android</dt>
+            <dd>Termux supported install target.</dd>
+          </dl>
+        </article>
+      </section>
+
+      <!-- ===== PART II HEADER ===== -->
+      <div class="hc-part">
+        <span class="hc-part-tag">PART II</span>
+        <span class="hc-part-h">In-session slash commands</span>
+        <span class="hc-part-dim">type <code>/</code> while chatting</span>
+      </div>
+
+      <section class="hc-grid">
+        <article class="hc-card hc-card-gold hc-card-wide">
+          <h2 class="hc-card-h">▸ SLASH COMMANDS</h2>
+          <p class="hc-card-sub">runtime knobs without leaving the session</p>
+          <dl class="hc-flags hc-flags-2col">
+            <dt><code>/model</code></dt>
+            <dd>Switch provider/model mid-session.</dd>
+            <dt><code>/compress</code></dt>
+            <dd>Summarize history before context overflow.</dd>
+            <dt><code>/usage</code></dt>
+            <dd>Show token / cost usage so far.</dd>
+            <dt><code>/skills</code></dt>
+            <dd>Browse / activate skills in this session.</dd>
+            <dt><code>/title</code></dt>
+            <dd>Rename the current session.</dd>
+            <dt><code>/sethome</code></dt>
+            <dd>Set the home channel for proactive messages.</dd>
+            <dt><code>/personality</code> <span class="hc-arg">&lt;preset&gt;</span></dt>
+            <dd>Swap <code>SOUL.md</code> preset for this session.</dd>
+            <dt><code>/rollback</code></dt>
+            <dd>Roll back to an earlier checkpoint.</dd>
+            <dt><code>/handoff</code></dt>
+            <dd><b>v0.14 new.</b> Transfer the active session — every message, every tool call, every piece of context — to another model, persona, or profile <i>live</i>.</dd>
+          </dl>
+        </article>
+      </section>
+
+      <!-- ===== PART III HEADER ===== -->
+      <div class="hc-part">
+        <span class="hc-part-tag">PART III</span>
+        <span class="hc-part-h">Hook events</span>
+        <span class="hc-part-dim">15 events across 3 hook systems</span>
+      </div>
+
+      <section class="hc-grid">
+        <article class="hc-card hc-card-bronze hc-card-wide">
+          <h2 class="hc-card-h">▸ HOOK SYSTEMS</h2>
+          <p class="hc-card-sub">three coexisting registration mechanisms</p>
+          <dl class="hc-flags">
+            <dt><b>Shell hooks</b></dt>
+            <dd>Declared as <code>hooks:</code> in <code>~/.hermes/config.yaml</code>. CLI + Gateway. Stdin / stdout protocol.</dd>
+            <dt><b>Plugin hooks</b></dt>
+            <dd><code>ctx.register_hook(event, handler)</code> inside a plugin's <code>__init__.py</code>. CLI + Gateway.</dd>
+            <dt><b>Gateway hooks</b></dt>
+            <dd>Bundle dir <code>~/.hermes/hooks/&lt;name&gt;/</code> with <code>HOOK.yaml</code> + <code>handler.py</code>. Gateway only.</dd>
+          </dl>
+        </article>
+
+        <article class="hc-card hc-card-amber hc-card-wide">
+          <h2 class="hc-card-h">▸ EVENTS (15)</h2>
+          <p class="hc-card-sub">where to plug in, what you can do</p>
+          <table class="hc-table">
+            <thead>
+              <tr><th>Event</th><th>Fires when</th><th>Can block / rewrite?</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>pre_tool_call</code></td><td>Before a tool executes</td><td>Yes — block</td></tr>
+              <tr><td><code>post_tool_call</code></td><td>After a tool returns</td><td>No</td></tr>
+              <tr><td><code>transform_tool_result</code></td><td>Before model sees tool output</td><td>Yes — rewrite</td></tr>
+              <tr><td><code>transform_terminal_output</code></td><td>Before terminal output truncated</td><td>Yes — rewrite</td></tr>
+              <tr><td><code>pre_llm_call</code></td><td>Before LLM turn; can inject context</td><td>Via return value</td></tr>
+              <tr><td><code>post_llm_call</code></td><td>After tool-calling loop completes</td><td>No</td></tr>
+              <tr><td><code>transform_llm_output</code></td><td>Rewrite final response text</td><td>Yes — rewrite</td></tr>
+              <tr><td><code>on_session_start</code></td><td>New session created</td><td>No</td></tr>
+              <tr><td><code>on_session_end</code></td><td>Session teardown</td><td>No</td></tr>
+              <tr><td><code>on_session_finalize</code></td><td>Before session ID discarded</td><td>No</td></tr>
+              <tr><td><code>on_session_reset</code></td><td>Fresh session key allocated</td><td>No</td></tr>
+              <tr><td><code>subagent_stop</code></td><td>Child agent exits</td><td>No</td></tr>
+              <tr><td><code>pre_gateway_dispatch</code></td><td>Before auth/dispatch (gateway)</td><td>Yes — skip / rewrite</td></tr>
+              <tr><td><code>pre_approval_request</code></td><td>Before user approval prompt</td><td>No</td></tr>
+              <tr><td><code>post_approval_response</code></td><td>After user approval decision</td><td>No</td></tr>
+            </tbody>
+          </table>
+          <p class="hc-note">
+            Shell hook wire protocol — stdin gets JSON with <code>hook_event_name</code> · <code>tool_name</code> · <code>tool_input</code> · <code>session_id</code> · <code>cwd</code>.<br/>
+            Stdout may return <code>&#123;"decision": "block", "reason": "..."&#125;</code> or <code>&#123;"context": "injected text"&#125;</code>. Non-zero exits log warnings but never crash the agent.
+          </p>
+        </article>
+      </section>
+
+      <!-- ===== PART IV HEADER ===== -->
+      <div class="hc-part">
+        <span class="hc-part-tag">PART IV</span>
+        <span class="hc-part-h">Files, paths, env vars</span>
+        <span class="hc-part-dim">where state lives</span>
+      </div>
+
+      <section class="hc-grid">
+        <article class="hc-card hc-card-teal hc-card-wide">
+          <h2 class="hc-card-h">▸ FILESYSTEM LAYOUT</h2>
+          <p class="hc-card-sub">under <code>~/.hermes/</code></p>
+          <dl class="hc-flags">
+            <dt><code>~/.hermes/config.yaml</code></dt>
+            <dd>Main configuration — hooks, providers, toolsets, gateway, terminal backend.</dd>
+            <dt><code>~/.hermes/SOUL.md</code></dt>
+            <dd>Global personality definition. First in system prompt.</dd>
+            <dt><code>~/.hermes/memories/MEMORY.md</code></dt>
+            <dd>Agent facts (2,200 char limit).</dd>
+            <dt><code>~/.hermes/memories/USER.md</code></dt>
+            <dd>User profile (1,375 char limit).</dd>
+            <dt><code>~/.hermes/skills/</code></dt>
+            <dd>Installed skills in SKILL.md format.</dd>
+            <dt><code>~/.hermes/state.db</code></dt>
+            <dd>SQLite session store. Resumed by <code>-r</code> / <code>-c</code>.</dd>
+            <dt><code>~/.hermes/shell-hooks-allowlist.json</code></dt>
+            <dd>Approved <code>(event, command)</code> pairs.</dd>
+            <dt><code>~/.hermes/hooks/&lt;name&gt;/</code></dt>
+            <dd>Gateway hook bundles (<code>HOOK.yaml</code> + <code>handler.py</code>).</dd>
+            <dt class="hc-dim">project-local</dt>
+            <dd><code>AGENTS.md</code> · <code>SOUL.md</code> · <code>.hermes.md</code> auto-discovered from working dir.</dd>
+          </dl>
+        </article>
+
+        <article class="hc-card hc-card-gold hc-card-wide">
+          <h2 class="hc-card-h">▸ ENV VARS</h2>
+          <p class="hc-card-sub">declared in <code>~/.hermes/.env</code> or shell</p>
+          <dl class="hc-flags hc-flags-2col">
+            <dt><code>HERMES_ACCEPT_HOOKS=1</code></dt>
+            <dd>Bypass hook consent prompts.</dd>
+            <dt><code>HERMES_SESSION_ID</code></dt>
+            <dd>Exposed to tools. Session-aware behavior.</dd>
+            <dt><code>HERMES_PLUGINS_DEBUG=1</code></dt>
+            <dd>Surface plugin discovery logs.</dd>
+            <dt><code>HERMES_FILE_MUTATION_VERIFIER=0</code></dt>
+            <dd>Disable per-turn write verifier.</dd>
+            <dt><code>API_SERVER_ENABLED=true</code></dt>
+            <dd>Embedded API server (default <code>false</code>).</dd>
+            <dt><code>API_SERVER_PORT=8642</code></dt>
+            <dd>Default port for the API server / proxy.</dd>
+            <dt><code>API_SERVER_HOST=127.0.0.1</code></dt>
+            <dd>Loopback by default.</dd>
+            <dt><code>API_SERVER_KEY=&lt;token&gt;</code></dt>
+            <dd>Required for non-loopback binding.</dd>
+            <dt><code>API_SERVER_CORS_ORIGINS</code></dt>
+            <dd>Enable browser access.</dd>
+            <dt><code>XAI_API_KEY</code></dt>
+            <dd>xAI Grok via API key (alt: <code>hermes auth add xai-oauth</code>).</dd>
+            <dt><code>DASHSCOPE_API_KEY</code></dt>
+            <dd>Qwen Cloud (formerly Alibaba Cloud).</dd>
+            <dt><code>TEAMS_CLIENT_ID</code> · <code>TEAMS_CLIENT_SECRET</code> · <code>TEAMS_TENANT_ID</code></dt>
+            <dd>Microsoft Teams integration credentials.</dd>
+            <dt><code>TEAMS_PORT=3978</code></dt>
+            <dd>Webhook listener port.</dd>
+            <dt><code>TERMINAL_BACKEND=docker</code></dt>
+            <dd>Sandboxed terminal for untrusted code.</dd>
+          </dl>
+        </article>
+      </section>
+
+      <!-- ===== PART V HEADER ===== -->
+      <div class="hc-part">
+        <span class="hc-part-tag">PART V</span>
+        <span class="hc-part-h">Best practices</span>
+        <span class="hc-part-dim">community-settled patterns</span>
+      </div>
+
+      <section class="hc-grid">
+        <article class="hc-card hc-card-amber hc-card-wide">
+          <h2 class="hc-card-h">▸ TEN HABITS WORTH STEALING</h2>
+          <p class="hc-card-sub">from <a href="https://hermes-agent.nousresearch.com/docs/guides/tips" rel="noopener">official tips</a> and <a href="https://github.com/0xNyk/awesome-hermes-agent" rel="noopener">awesome-hermes-agent</a></p>
+          <ol class="hc-list">
+            <li><b>Distinguish memory from skills.</b> <code>MEMORY.md</code> holds <i>what</i>; skills hold <i>how</i>.</li>
+            <li><b>Auto-capture workflows as skills.</b> After any 5+ step task, ask the agent to save the approach as a skill.</li>
+            <li><b>Front-load context in <code>AGENTS.md</code>.</b> Don't re-explain conventions every session.</li>
+            <li><b>Keep system prompt stable for cache hits.</b> Frontier model for reasoning; faster model for formatting.</li>
+            <li><b>Run <code>/compress</code> before <code>/usage</code> screams.</b> Summarize history at the threshold, not after.</li>
+            <li><b>Delegate parallel work via subagents.</b> Default 3 concurrent. Combine with <code>hermes kanban</code> for multi-profile flow.</li>
+            <li><b>One profile per domain.</b> Coding · research · ops. <code>hermes profile</code> is fully isolated state.</li>
+            <li><b>Layer memory intentionally.</b> Honcho for peer modeling, Hindsight for graphs, Holographic for local-only.</li>
+            <li><b>Guard self-evolution with regression checks.</b> Silent drift is the community-flagged failure mode.</li>
+            <li><b>Scope approval before trusting.</b> "Session" before "always". Docker terminal backend for untrusted code.</li>
+          </ol>
+        </article>
+      </section>
+
+      <footer class="hc-foot">
+        <span class="hc-foot-tag">▮ HERMES-CORE · CHEATSHEET · MIT · {new Date().getFullYear()} ▮</span>
+      </footer>
+    </main>
+
+    <style is:global>
+      .hc-body {
+        background: var(--color-bg);
+        color: var(--color-fg);
+        min-height: 100vh;
+      }
+
+      .hc-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--color-bronze);
+        background: var(--color-surface);
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+      }
+      .hc-back {
+        color: var(--color-amber);
+      }
+      .hc-back:hover { color: var(--color-gold); }
+      .hc-nav {
+        display: flex;
+        gap: 1.5rem;
+      }
+      .hc-nav a {
+        color: var(--color-fg-dim);
+      }
+      .hc-nav a:hover { color: var(--color-gold); }
+      .hc-here {
+        color: var(--color-gold);
+        font-weight: 700;
+      }
+
+      .hc-page {
+        max-width: 84rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem 4rem;
+      }
+
+      .hc-banner {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+
+      .hc-strip {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        color: var(--color-bronze);
+        text-transform: uppercase;
+        margin-bottom: 1.25rem;
+      }
+
+      .hc-title {
+        font-family: var(--font-display);
+        font-weight: 900;
+        line-height: 1.02;
+        font-size: clamp(2.5rem, 7vw, 5.5rem);
+        margin: 0 0 1rem;
+        letter-spacing: -0.02em;
+      }
+      .hc-title-line { display: block; color: var(--color-fg); }
+      .hc-title-accent { color: var(--color-gold); font-style: italic; }
+
+      .hc-tag {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        letter-spacing: 0.18em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+        margin: 1rem 0 0.5rem;
+      }
+      .hc-subtag {
+        font-size: 0.95rem;
+        color: var(--color-fg-dim);
+      }
+      .hc-subtag code { color: var(--color-amber); }
+
+      .hc-hub {
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        padding: 1.5rem;
+        margin-bottom: 2.5rem;
+      }
+      .hc-hub-h {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.18em;
+        color: var(--color-gold);
+        text-transform: uppercase;
+      }
+      .hc-hub-here {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--color-fg-dim);
+        display: block;
+        margin-top: 0.25rem;
+      }
+      .hc-here-tag {
+        color: var(--color-amber);
+      }
+      .hc-hub-intro {
+        font-size: 0.9rem;
+        color: var(--color-fg);
+        margin: 0.8rem 0 1.25rem;
+      }
+      .hc-hub-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+        gap: 0.85rem;
+      }
+      .hc-hub-card {
+        --hc-c: var(--color-gold);
+        padding: 0.85rem 1rem;
+        background: var(--color-bg);
+        border-left: 3px solid var(--hc-c);
+        display: block;
+      }
+      .hc-hub-card:hover { background: var(--color-surface-mid); }
+      .hc-hub-card-amber { --hc-c: var(--color-amber); }
+      .hc-hub-card-bronze { --hc-c: var(--color-bronze); }
+      .hc-hub-card-h {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin-bottom: 0.35rem;
+      }
+      .hc-hub-card-n {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--color-fg-dim);
+      }
+      .hc-hub-card-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        color: var(--hc-c);
+        flex: 1;
+      }
+      .hc-hub-card-arr {
+        color: var(--hc-c);
+      }
+      .hc-hub-card-desc {
+        font-size: 0.85rem;
+        color: var(--color-fg);
+        margin: 0;
+      }
+      .hc-hub-card-desc code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.3rem;
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+
+      .hc-part {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        margin: 3rem 0 1.25rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--color-bronze);
+      }
+      .hc-part-tag {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.18em;
+        color: var(--color-bronze);
+        background: var(--color-surface);
+        padding: 0.2rem 0.55rem;
+        border: 1px solid var(--color-bronze);
+      }
+      .hc-part-h {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--color-gold);
+        flex: 1;
+      }
+      .hc-part-dim {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--color-fg-dim);
+        letter-spacing: 0.06em;
+      }
+      .hc-part-dim code {
+        color: var(--color-amber);
+      }
+
+      .hc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .hc-card {
+        --hc-c: var(--color-gold);
+        background: var(--color-surface);
+        border: 1px solid var(--color-bronze);
+        border-left: 3px solid var(--hc-c);
+        padding: 1.25rem;
+      }
+      .hc-card-wide {
+        grid-column: 1 / -1;
+      }
+      .hc-card-gold   { --hc-c: var(--color-gold); }
+      .hc-card-amber  { --hc-c: var(--color-amber); }
+      .hc-card-bronze { --hc-c: var(--color-bronze); }
+      .hc-card-teal   { --hc-c: var(--color-teal); }
+
+      .hc-card-h {
+        font-family: var(--font-mono);
+        font-size: 0.95rem;
+        letter-spacing: 0.08em;
+        color: var(--hc-c);
+        margin: 0 0 0.25rem;
+        text-transform: uppercase;
+      }
+      .hc-card-sub {
+        font-size: 0.78rem;
+        color: var(--color-fg-dim);
+        margin: 0 0 1rem;
+        font-style: italic;
+      }
+
+      .hc-flags {
+        margin: 0;
+        font-size: 0.875rem;
+      }
+      .hc-flags dt {
+        font-family: var(--font-mono);
+        color: var(--color-fg);
+        margin-top: 0.7rem;
+      }
+      .hc-flags dt:first-child { margin-top: 0; }
+      .hc-flags dt code {
+        color: var(--color-amber);
+      }
+      .hc-flags dt b {
+        color: var(--color-gold);
+      }
+      .hc-flags dt.hc-dim {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--color-fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .hc-flags dd {
+        margin: 0.2rem 0 0 0;
+        color: var(--color-fg);
+        line-height: 1.55;
+        font-size: 0.88rem;
+      }
+      .hc-flags dd code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.3rem;
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+      .hc-flags dd b {
+        color: var(--color-gold);
+      }
+      .hc-arg {
+        color: var(--color-fg-dim);
+        font-family: var(--font-mono);
+        font-size: 0.85em;
+        font-style: italic;
+      }
+      .hc-flags-2col {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.45rem;
+      }
+      .hc-flags-2col dt {
+        margin-top: 0;
+      }
+      .hc-flags-2col dd {
+        margin: 0;
+      }
+
+      .hc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+        margin-top: 0.5rem;
+      }
+      .hc-table th {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-bronze);
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid var(--color-bronze);
+      }
+      .hc-table td {
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid var(--color-surface-hi);
+        color: var(--color-fg);
+        vertical-align: top;
+      }
+      .hc-table td:first-child {
+        font-family: var(--font-mono);
+      }
+      .hc-table td code {
+        color: var(--color-amber);
+      }
+
+      .hc-note {
+        margin-top: 1rem;
+        font-size: 0.78rem;
+        color: var(--color-fg-dim);
+        line-height: 1.6;
+        padding: 0.6rem 0.85rem;
+        background: var(--color-bg);
+        border-left: 2px solid var(--color-bronze);
+      }
+      .hc-note code {
+        color: var(--color-amber);
+        font-size: 0.95em;
+      }
+
+      .hc-list {
+        margin: 0;
+        padding-left: 1.5rem;
+        line-height: 1.6;
+        font-size: 0.92rem;
+      }
+      .hc-list li {
+        margin-bottom: 0.55rem;
+      }
+      .hc-list b {
+        color: var(--color-gold);
+        font-weight: 600;
+      }
+      .hc-list code {
+        background: var(--color-surface-mid);
+        padding: 0.05rem 0.3rem;
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+      .hc-list i {
+        color: var(--color-fg-dim);
+      }
+      .hc-card-sub a {
+        color: var(--color-amber);
+        border-bottom: 1px dotted var(--color-amber);
+      }
+
+      .hc-foot {
+        text-align: center;
+        padding-top: 3rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        letter-spacing: 0.15em;
+        color: var(--color-bronze);
+      }
+
+      @media print {
+        :root {
+          --color-bg: #ffffff;
+          --color-surface: #ffffff;
+          --color-surface-mid: #fafafa;
+          --color-fg: #111111;
+          --color-fg-dim: #555555;
+          --color-bronze: #555555;
+        }
+        .hc-top, .hc-foot { display: none; }
+        .hc-card { break-inside: avoid; border: 1px solid #999; }
+        .hc-part { break-before: page; }
+      }
+    </style>
+  </body>
+</html>
