@@ -77,6 +77,59 @@
   }
 }
 
+/* ===== SHARED HERO PRIMITIVES (used by every surface banner) ===== */
+.hc-title {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.02;
+  font-size: clamp(2.5rem, 7vw, 5.5rem);
+  margin: 0 0 1rem;
+  letter-spacing: -0.02em;
+}
+.hc-title-line {
+  display: block;
+  color: var(--color-fg);
+}
+.hc-title-accent {
+  color: var(--color-gold);
+  font-style: italic;
+}
+.hc-tag {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  color: var(--color-gold);
+  text-transform: uppercase;
+  margin: 1rem 0 0.5rem;
+}
+.hc-subtag {
+  font-size: 0.95rem;
+  color: var(--color-fg-dim);
+}
+.hc-subtag code {
+  color: var(--color-amber);
+}
+.hc-strip {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--color-bronze);
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+.hc-foot {
+  text-align: center;
+  padding-top: 3rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: var(--color-bronze);
+}
+
 /* ===== SHARED TOP BAR PRIMITIVES (used by every surface) ===== */
 .hc-top {
   display: flex;
