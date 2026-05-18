@@ -1,0 +1,488 @@
+---
+import "../styles/global.css";
+import ResourcesMenu from "../components/ResourcesMenu.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const siteUrl = "https://cfpperche.github.io";
+const HERMES_VERSION = "0.14.0";
+const HERMES_TAG = "v2026.5.16";
+
+const pageTitle = `Hermes Agent · Scaling Hermes · v${HERMES_VERSION}`;
+const pageDesc = `A maturity model for scaling Hermes Agent setups across four levels — main agent, specialists, orchestrated team, automated team. For each level: the shape, the failure mode, and the promotion gate. Plus a cross-cutting capability table and four anti-patterns to avoid.`;
+
+const levels = [
+  { n: 1, slug: "main",         tag: "main agent",          fam: "fl-a" },
+  { n: 2, slug: "specialist",   tag: "specialized agents",  fam: "fl-b" },
+  { n: 3, slug: "orchestrated", tag: "orchestrated team",   fam: "fl-c" },
+  { n: 4, slug: "automated",    tag: "automated team",      fam: "fl-d" },
+];
+---
+
+<!doctype html>
+<html lang="en" data-theme="hermes">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDesc} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDesc} />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content={`${siteUrl}${base}/scale/`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="hc-body">
+    <header class="hc-top">
+      <a href={`${base}/`} class="hc-back">← hermes-core</a>
+      <ResourcesMenu current="scale" />
+      <div class="hc-tools">
+        <button id="hc-pdf" type="button" class="cs-tool-btn" title="Print as PDF">
+          <span aria-hidden="true">↓</span> PDF
+        </button>
+      </div>
+    </header>
+
+    <main class="ck-page sc-page">
+      <section class="ck-banner">
+        <div class="hc-strip">
+          <span>▮ HERMES-CORE · SCALE</span>
+          <span>v{HERMES_VERSION} · {HERMES_TAG}</span>
+          <span>4 LEVELS · 3 GATES ▮</span>
+        </div>
+        <h1 class="hc-title">
+          <span class="hc-title-line">FROM ONE AGENT</span>
+          <span class="hc-title-line hc-title-accent sc-accent">TO A TEAM</span>
+        </h1>
+        <p class="hc-tag">L1 PROTOTYPE · L2 SPECIALIST · L3 ORCHESTRATED · L4 AUTOMATED</p>
+        <p class="hc-subtag">
+          A maturity model for scaling Hermes — four levels, three promotion gates. For each level: <b>the shape, the failure mode, the criteria to promote</b>. Most users belong at Level 1 forever, refining one good agent. The mistake is not aiming high — it's promoting before passing the gate. <i>Three great agents beat twenty mediocre ones, and twenty mediocre agents fired by cron is the worst version of all.</i>
+        </p>
+      </section>
+
+      <!-- TOC -->
+      <section class="in-toc">
+        <h2 class="in-h">▸ TABLE OF CONTENTS</h2>
+        <ol class="in-toc-list">
+          <li><a href="#s0"><span class="in-toc-n">00</span><span class="in-toc-title">Why a maturity model</span><span class="in-toc-tag">intro</span></a></li>
+          {levels.map((l) => (
+            <li>
+              <a href={`#s${l.n}`}>
+                <span class="in-toc-n">{`L${l.n}`}</span>
+                <span class="in-toc-title">{`Level ${l.n} — ${l.tag}`}</span>
+                <span class="in-toc-tag">{l.fam}</span>
+              </a>
+            </li>
+          ))}
+          <li><a href="#s5"><span class="in-toc-n">05</span><span class="in-toc-title">Cross-cutting requirements</span><span class="in-toc-tag">capability grid</span></a></li>
+          <li><a href="#s6"><span class="in-toc-n">06</span><span class="in-toc-title">When NOT to promote</span><span class="in-toc-tag">anti-patterns</span></a></li>
+          <li><a href="#s7"><span class="in-toc-n">07</span><span class="in-toc-title">Closer + further reading</span><span class="in-toc-tag">resources</span></a></li>
+        </ol>
+      </section>
+
+      <!-- ===== §0 INTRO ===== -->
+      <section id="s0" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">00</span>
+          <h2>Why a maturity model</h2>
+          <span class="in-mod-tag">intro</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Most agent users live at Level 1 forever. The ones who scale either rush to Level 4 and discover, too late, that they scaled the wrong things — or they pass through each level on purpose. <b>This page is for the second group.</b></p>
+
+        <p>The four levels below describe a single decision in slow motion: <i>when to stop refining and start delegating</i>. Each level has more reach, more leverage, and a wider blast radius. Each transition trades a manual cost (you, present, in the loop) for an automation cost (something else has to be in the loop reliably). The whole point of a maturity model is to make that trade <b>verifiable</b> instead of vibes-based.</p>
+
+        <p>For each level you'll see three columns:</p>
+        <ul class="in-ul">
+          <li><b>Shape</b> — what the system actually looks like, in one diagram.</li>
+          <li><b>Failure mode</b> — what goes wrong if you stay here too long, or if you promote without earning it.</li>
+          <li><b>Promotion gate</b> — verifiable criteria you check before moving up a level. No checklist passes, no promotion.</li>
+        </ul>
+
+        <p class="ck-gotcha"><b>Anti-slop principle.</b> Three agents shipping great work beats twenty agents shipping mediocre work. Twenty agents shipping mediocre work fired by cron is the worst version of all. <b>Mediocrity scales faster than excellence</b> — that's why the gates matter.</p>
+      </section>
+
+      <!-- ===== §1 LEVEL 1 ===== -->
+      <section id="s1" class="ck-mod sc-mod sc-fl-a">
+        <header class="in-mod-h">
+          <span class="in-mod-n">L1</span>
+          <h2>Level 1 — main agent</h2>
+          <span class="in-mod-tag">prototype + orchestrator</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> You and one Hermes Agent, talking. It's your daily driver, your scratchpad, your prototype area, and your orchestrator — all at once. <b>Most users belong here forever.</b></p>
+
+        <h3 class="in-h3">Shape</h3>
+        <pre class="ht-code"><code>You ⇄ Hermes Agent
+        │
+        ├─ memory   (~/.hermes/state/)
+        ├─ tools    (built-in + MCP)
+        └─ skills   (~/.hermes/skills/)</code></pre>
+
+        <p>A single Hermes process. One identity (one <code>SOUL.md</code>, one <code>MEMORY.md</code>, one <code>USER.md</code>), one credentials bucket, one conversation history. You open it, you talk, you close it. Workflow refinement happens <i>inside</i> this single agent — you discover what works, what breaks, what's worth keeping. Until something earns promotion, this is also your orchestrator-in-disguise: you route between sub-skills mentally because you're the one in the loop.</p>
+
+        <h3 class="in-h3">Failure mode</h3>
+        <ul class="in-ul">
+          <li><b>No structured audit trail.</b> Conversations live in the SQLite v11 state — readable, but not reviewable at scale. Three months in, "what did I do last Tuesday" turns into archaeology.</li>
+          <li><b>Credentials in one bucket.</b> Whatever the main agent can do, the main agent can mess up. The same API key that drafts your blog post can also delete your DNS records.</li>
+          <li><b>Repeat reliability unproven.</b> A workflow that worked once is a demo. A workflow that worked ten times unattended is a process. Most workflows at L1 are still demos.</li>
+          <li><b>Cognitive load disguised as flexibility.</b> Because you're the orchestrator, you don't notice the load you're carrying. The day you do notice is the day a specialist would've helped — but only if you'd built it ahead of the breaking point.</li>
+        </ul>
+
+        <h3 class="in-h3">Promotion gate → L2</h3>
+        <p>Pass <b>all three</b> before splitting a workflow into a dedicated specialist:</p>
+        <ol class="in-ol">
+          <li><b>The workflow has run successfully ≥10 times unattended.</b> "Unattended" means you didn't intervene mid-run, you didn't correct framing partway through, you didn't paste in missing context. Counts you can verify from the SQLite state, not from memory.</li>
+          <li><b>The workflow uses a credential or scope worth isolating.</b> If the workflow touches ahrefs but never posthog, the ahrefs key belongs in its own agent. If the workflow uses only credentials the main agent already needs everywhere, there's nothing to isolate yet.</li>
+          <li><b>You can describe the workflow in one sentence + five acceptance bullets.</b> If you can't, you don't understand it well enough to hand it to a separate agent. Refine the prompt until the description is sharp, then promote.</li>
+        </ol>
+
+        <p class="ck-gotcha"><b>Gotcha.</b> If any gate fails, stay at L1 and refine. Adding a specialist over an unstable workflow doesn't promote the workflow — it duplicates the instability with extra coordination overhead.</p>
+      </section>
+
+      <!-- ===== §2 LEVEL 2 ===== -->
+      <section id="s2" class="ck-mod sc-mod sc-fl-b">
+        <header class="in-mod-h">
+          <span class="in-mod-n">L2</span>
+          <h2>Level 2 — specialized agents</h2>
+          <span class="in-mod-tag">scoped responsibility</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Each agent owns one workflow, one credentials scope, one voice. You're still the router. The leverage comes from <i>isolation</i>, not yet from automation.</p>
+
+        <h3 class="in-h3">Shape</h3>
+        <pre class="ht-code"><code>You ──┬→ SEO Agent      (ahrefs, gscholar)
+      ├→ CMO Agent      (mailchimp, posthog)
+      └→ Ops Agent      (slack, github)
+
+Each agent lives under:
+  ~/.hermes/agents/&lt;name&gt;/
+    ├─ soul.md         (persona, voice rules)
+    ├─ skills/
+    ├─ state/
+    └─ creds/</code></pre>
+
+        <p>Each specialist is a separate Hermes process (or profile) with its own filesystem footprint. A specialist owns one workflow family — SEO research, marketing copy, ops automation, etc. — and refuses to step outside its scope. The <code>soul.md</code> per agent gives each one a distinct voice; the per-agent <code>creds/</code> directory means a token leak in one specialist can't take down the others. Cross-talk is forbidden by design; you, the human, are still the coordination layer.</p>
+
+        <h3 class="in-h3">Failure mode</h3>
+        <ul class="in-ul">
+          <li><b>Cross-agent context loss.</b> You ask Ops Agent something only SEO Agent knows. You become the conduit, manually replaying context across processes. The friction is real but invisible until you measure it.</li>
+          <li><b>Specialist drift.</b> Without explicit review cycles, each specialist's behavior shifts session-to-session as you tweak its <code>soul.md</code> or its skills. After a month, two specialists you "thought" did similar work actually solve different problems in incompatible ways.</li>
+          <li><b>You become the bottleneck.</b> Routing between three agents manually is more cognitive load than running one. The win at L2 is isolation; if you don't feel it, you may have promoted prematurely.</li>
+          <li><b>Skill duplication.</b> The same "summarize a PDF" or "draft an email" skill ends up copy-pasted across three specialists with three slight variations. Useful in the short term, painful when one variation drifts.</li>
+        </ul>
+
+        <h3 class="in-h3">Promotion gate → L3</h3>
+        <ol class="in-ol">
+          <li><b>Each specialist passes its own L1→L2 gate.</b> Same three criteria, applied independently. A specialist that hasn't run 10 times reliably isn't ready to be conducted by an orchestrator.</li>
+          <li><b>You're routing between specialists manually ≥5 times per week.</b> Below that, an orchestrator is overhead with no payoff. Above it, the routing decisions themselves become a workflow worth delegating.</li>
+          <li><b>The handoff protocol between specialists is documented.</b> When SEO Agent finishes a research pass and Ops Agent picks up the publishing step, what does the handoff look like? If you can't write it down, the orchestrator at L3 will have to invent it — badly.</li>
+        </ol>
+
+        <p class="ck-gotcha"><b>Gotcha.</b> The temptation at L2 is to add a fourth, fifth, sixth specialist before stabilizing the first three. Resist it. Three healthy specialists are infinitely more useful than six brittle ones — and the orchestrator at L3 needs <i>healthy</i> inputs, not abundant ones.</p>
+      </section>
+
+      <!-- ===== §3 LEVEL 3 ===== -->
+      <section id="s3" class="ck-mod sc-mod sc-fl-c">
+        <header class="in-mod-h">
+          <span class="in-mod-n">L3</span>
+          <h2>Level 3 — orchestrated team</h2>
+          <span class="in-mod-tag">delegated routing</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> An orchestrator decides who does what. You hand it work; it dispatches to specialists, aggregates outputs, returns one answer. The blast radius widens here — opacity is the new failure surface.</p>
+
+        <h3 class="in-h3">Shape</h3>
+        <pre class="ht-code"><code>You → Orchestrator
+         │
+         ├→ SEO Agent
+         ├→ CMO Agent
+         └→ Ops Agent
+
+Orchestrator loop:
+  1. read request
+  2. decide which specialist (or many, in parallel)
+  3. dispatch with a brief
+  4. collect responses
+  5. resolve conflicts
+  6. return one aggregated answer</code></pre>
+
+        <p>You delegate the routing decision. Multi-specialist tasks become possible: "Plan a launch" becomes "SEO research → CMO copy → Ops scheduling," fanned out and aggregated by the orchestrator. The orchestrator carries its own discipline rules: when to dispatch (and when to just answer directly), how much context to forward to each specialist, how to handle contradictory outputs.</p>
+
+        <h3 class="in-h3">Failure mode</h3>
+        <p>The opacity of L3 is the source of every failure here. You no longer see the routing decision. You no longer see the brief. You no longer see the specialist's reasoning before aggregation. Each layer of indirection hides one more thing.</p>
+        <ul class="in-ul">
+          <li><b>Opaque dispatch decisions.</b> The orchestrator routes to SEO when CMO was the right call. You can't tell unless you read the dispatch log — and at L3 most teams don't.</li>
+          <li><b>Specialist conflict.</b> Two agents return contradictory recommendations. Who decides? Default: the orchestrator. On what basis? <i>Whatever you wrote into its prompt</i>, which you likely under-specified.</li>
+          <li><b>Cascading silent failure.</b> Specialist fails or returns garbage; orchestrator wraps it and says "done"; you trust the wrapper. Failures at L3 don't shout — they get summarized.</li>
+          <li><b>Brief drift.</b> The orchestrator's briefs to specialists are short, vague, or missing context. Specialists invent their own framing. Same failure mode as a manager writing one-line tickets — except now the manager is automated and never asks for clarification.</li>
+        </ul>
+
+        <h3 class="in-h3">Mitigations you cannot skip at L3</h3>
+        <ul class="in-ul">
+          <li><b>Readable dispatch logs.</b> Not just structured — readable. Who got which brief, what they returned, why the orchestrator chose them. A log you have to grep is a log nobody reads.</li>
+          <li><b>A handoff protocol the orchestrator follows.</b> Every dispatch should include task, context, constraints, and a done-when condition. If a brief is missing any of those, the orchestrator either refuses to dispatch or asks for clarification before proceeding. This protocol is the difference between an orchestrator and a randomizer.</li>
+          <li><b>A documented rollback path per specialist.</b> When a specialist's output is wrong, what does "undo" look like? At L3 it can still be manual ("ask the specialist to redo," "overwrite the file") — but the path must be written down.</li>
+          <li><b>Periodic dispatch review.</b> Once a week, read a week of dispatch logs. Not to catch bugs (you have alerting for that) — to catch <i>drift</i> in how the orchestrator is routing.</li>
+        </ul>
+
+        <h3 class="in-h3">Promotion gate → L4</h3>
+        <ol class="in-ol">
+          <li><b>Dispatch decisions are predictable across 20+ runs.</b> You can guess the orchestrator's routing before reading the log. If you can't, the orchestrator is too clever and you're about to automate its mistakes.</li>
+          <li><b>Every specialist has a written rollback procedure.</b> Documented, tested, runnable without you in the room.</li>
+          <li><b>Failure modes are observable in minutes, not days.</b> If a specialist returns garbage, you find out the same day, not next week. An alerting stack worth its salt.</li>
+          <li><b>You're running the same family of tasks every week.</b> Automation needs a stable substrate. If the work is still inventing itself, cron will lock in mistakes.</li>
+        </ol>
+
+        <p class="ck-gotcha"><b>Gotcha.</b> Adding cron at L3 without passing this gate is exactly how teams ship slop at scale. The orchestrator's mistakes become hourly, then daily, then weekly — never noticed because nobody triggered them. <b>Cron is not a tool for tired humans; it's a tool for stable systems.</b></p>
+      </section>
+
+      <!-- ===== §4 LEVEL 4 ===== -->
+      <section id="s4" class="ck-mod sc-mod sc-fl-d">
+        <header class="in-mod-h">
+          <span class="in-mod-n">L4</span>
+          <h2>Level 4 — automated team</h2>
+          <span class="in-mod-tag">trigger-driven, async</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Cron, webhooks, calendar events, or queue messages fire jobs. The orchestrator routes them through a task bus; specialists pick up work async; the team runs while you sleep. <b>This is the promise. It is also the threat.</b></p>
+
+        <h3 class="in-h3">Shape</h3>
+        <pre class="ht-code"><code>Cron / Webhooks / Events ─→ Orchestrator
+                                  │
+                                  ├→ SEO Agent
+                                  ├→ CMO Agent
+                                  └→ Ops Agent
+                                  ↓
+                              Task Bus
+                                  │
+                                  ├─ in-flight queue
+                                  ├─ completed queue
+                                  └─ dead-letter queue</code></pre>
+
+        <p>The trigger surface widens from "you, at your keyboard" to "anything in the world that can publish an event." Async becomes the default: tasks land in a bus, agents pick them up, the orchestrator routes, and outputs flow back asynchronously. You stop being the loop and become an observer — and occasionally, when things go wrong, the on-call.</p>
+
+        <h3 class="in-h3">Failure mode</h3>
+        <ul class="in-ul">
+          <li><b>Silent failures.</b> A job fires, an agent botches it, no human notices for days. The task bus says <code>delivered</code>; the world says <code>broken</code>. Detection lag becomes a first-class concern.</li>
+          <li><b>Slop at scale.</b> Mediocre output at L1 was annoying. At L4 it compounds. Fifty mediocre emails sent overnight is worse than one mediocre email reviewed at 9am.</li>
+          <li><b>State corruption.</b> Multiple agents writing to the same external system in parallel — race conditions in shared memory, double-writes, partial updates. You designed for one human plus one agent; you got many agents plus zero humans.</li>
+          <li><b>The audit trail problem becomes existential.</b> When something goes wrong on Tuesday and you have to reconstruct it on Thursday, can you? At L4 this stops being optional. "I trust my agents" is not a reconstruction strategy.</li>
+        </ul>
+
+        <h3 class="in-h3">Non-negotiables at L4</h3>
+        <ul class="in-ul">
+          <li><b>Dead-letter queue.</b> Tasks that fail don't vanish — they land in a queue you check daily. No DLQ, no L4.</li>
+          <li><b>Output review window.</b> High-stakes work (email sends, money movement, public posts) lands in a 60-minute hold where you can intervene. The cost of the hold is small; the cost of skipping it is unbounded.</li>
+          <li><b>Periodic team audit.</b> Once a week, read a full week of orchestrator + specialist logs. Not to catch bugs (alerting already does that) — to catch <i>drift</i>. Drift at L4 looks like correctness but isn't.</li>
+          <li><b>Kill switch.</b> A single command, env var, or webhook toggle that halts the team. Document it, test it monthly. The day you need it is the day you discover whether it works.</li>
+          <li><b>Versioned briefs.</b> The orchestrator's dispatch templates should live in version control with the same review discipline as production code. A silently-edited brief is the L4 equivalent of changing a function signature without tests.</li>
+        </ul>
+
+        <p class="ck-gotcha"><b>There is no Level 5.</b> L4 is where the discipline conversation lives forever. "Beyond L4" is the practice of <i>keeping</i> L4 healthy — auditing, pruning specialists that no longer earn their keep, rewriting briefs that have drifted, killing automations that outlived their use case. <b>The work at L4 is not building more; it's curating what's already there.</b></p>
+      </section>
+
+      <!-- ===== §5 CROSS-CUTTING ===== -->
+      <section id="s5" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">05</span>
+          <h2>Cross-cutting requirements</h2>
+          <span class="in-mod-tag">capability grid</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Five capabilities, four levels. The cells show what's optional, needed, required, non-negotiable. <b>What you skipped at L1 becomes load-bearing at L3.</b></p>
+
+        <div class="sc-grid-wrap">
+          <table class="sc-grid">
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>L1 main</th>
+                <th>L2 specialist</th>
+                <th>L3 orchestrated</th>
+                <th>L4 automated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Audit trail</b></td>
+                <td>nice-to-have</td>
+                <td>needed for review</td>
+                <td class="sc-cell-warn">required</td>
+                <td class="sc-cell-crit">non-negotiable</td>
+              </tr>
+              <tr>
+                <td><b>Credential isolation</b></td>
+                <td>one bucket</td>
+                <td>per-agent</td>
+                <td>per-agent + dispatch logs</td>
+                <td class="sc-cell-crit">per-agent + secret rotation</td>
+              </tr>
+              <tr>
+                <td><b>Memory scope</b></td>
+                <td>shared state</td>
+                <td>per-agent</td>
+                <td>per-agent + dispatch ctx</td>
+                <td>per-agent + task bus</td>
+              </tr>
+              <tr>
+                <td><b>Observability</b></td>
+                <td>conversation log</td>
+                <td>per-agent log</td>
+                <td class="sc-cell-warn">dispatch + agent logs</td>
+                <td class="sc-cell-crit">task bus + DLQ + alerting</td>
+              </tr>
+              <tr>
+                <td><b>Discipline rules</b></td>
+                <td>your habits</td>
+                <td>per-agent <code>soul.md</code></td>
+                <td>orchestrator handoff protocol</td>
+                <td class="sc-cell-crit">full incident response</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>The grid makes the bill explicit. Audit trail being "nice-to-have" at L1 is honest — most users never review their own conversations and that's fine. The same audit trail being "required" at L3 isn't a stylistic upgrade; it's the only way to debug an orchestrator that doesn't explain itself. The same capability, three levels later, becomes load-bearing.</p>
+
+        <p class="ck-gotcha"><b>The asymmetry of promotion.</b> Adding capabilities <i>in advance</i> of needing them costs almost nothing. Adding them <i>after</i> a level promotion costs a rewrite. Lean up the grid before you climb, not after.</p>
+      </section>
+
+      <!-- ===== §6 ANTI-PATTERNS ===== -->
+      <section id="s6" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">06</span>
+          <h2>When NOT to promote</h2>
+          <span class="in-mod-tag">anti-patterns</span>
+        </header>
+
+        <p class="in-tldr"><b>TL;DR.</b> Four scenarios where the temptation to promote a level is actually a symptom that you haven't finished the level you're already on.</p>
+
+        <article class="sc-anti">
+          <h3 class="in-h3">"My L1 main agent is shaky but I want to add a specialist."</h3>
+          <p>You don't have a scaling problem — you have an <i>unfinished L1 workflow</i>. Adding a specialist over an unstable workflow does not promote the workflow; it duplicates the instability with extra coordination overhead. The right move is to get the L1 workflow to 10/10 reliability first, then split.</p>
+        </article>
+
+        <article class="sc-anti">
+          <h3 class="in-h3">"I'm tired of triggering my L3 team, time for cron."</h3>
+          <p>Being tired of triggering is not the same as the system being ready for cron. Cron makes the tired-of-triggering problem <i>permanent, not solved</i>. If the trigger is annoying because the system is half-working, automating the trigger doesn't fix the system — it just removes your last chance to catch the half-working state. Stabilize first, automate second.</p>
+        </article>
+
+        <article class="sc-anti">
+          <h3 class="in-h3">"I want to skip L1 → L3 because the orchestrator looks cool."</h3>
+          <p>An orchestrator directing immature specialists is the canonical recipe for compound failure: every bug in every specialist is now hidden behind a routing layer, and the routing layer has no insight into bugs it didn't cause. The orchestrator inherits the bug surface of all its specialists, with no debugging path through the layers. Build L1 → L2 → L3 in that order, even if it feels slow.</p>
+        </article>
+
+        <article class="sc-anti">
+          <h3 class="in-h3">"My L4 cron team worked all week, time to grow the team."</h3>
+          <p>Maybe. But the test of L4 is not <i>did it run</i>; it's <i>can I reconstruct what it did last Tuesday and prove it was right</i>. If the answer is no, the L4 is theatrical, not real — it's running, but it's not auditable, which means at any moment it could be silently broken. Grow the team only after the existing team is reconstructable.</p>
+        </article>
+      </section>
+
+      <!-- ===== §7 CLOSER ===== -->
+      <section id="s7" class="ck-mod">
+        <header class="in-mod-h">
+          <span class="in-mod-n">07</span>
+          <h2>Closer + further reading</h2>
+          <span class="in-mod-tag">resources</span>
+        </header>
+
+        <p>The four-level model is not a roadmap to a twenty-agent team. It's a maturity model for one specific decision: <b>when to stop refining and start delegating</b>. Most users belong at L1 forever, refining one good agent. Some belong at L2 — two or three specialists, clean scope. A few belong at L3, with a real orchestrator that earns its keep. <b>Almost nobody belongs at L4 unintentionally.</b></p>
+
+        <p>The error pattern at every level is the same: promoting before passing the gate. The gate exists because the next level inherits every weakness of the previous one and amplifies it. Three great agents beat twenty mediocre ones; twenty mediocre agents fired by cron is the worst version of all.</p>
+
+        <p>If you read only one thing from this page and ignore the rest: <b>pass the gate before you promote.</b></p>
+
+        <h3 class="in-h3">Further reading</h3>
+        <ul class="in-ul">
+          <li><a href="https://x.com/shannholmberg/status/2056410242330874349" rel="noopener">"4 levels of Hermes Agent setup"</a> by Shann³ (<code>@shannholmberg</code>, May 2026) — the originating framing for the four levels described here.</li>
+          <li><a href="https://x.com/akshay_pachaar/status/2055629943891988719" rel="noopener">"Anatomy of <code>~/.hermes</code>"</a> by Akshay (<code>@akshay_pachaar</code>, May 2026) — required reading before you spin a second agent. Knowing the layout is the difference between treating Hermes as a black box and actually scaling it.</li>
+          <li><a href="https://x.com/NousResearch/status/2056110234309939330" rel="noopener">Hermes Agent v0.14.0 — "Foundation Release"</a> by Nous Research (May 2026) — the version this page targets.</li>
+          <li>Hermes-core <a href={`${base}/internals/`}>Internals</a> — what's under the hood at every level.</li>
+          <li>Hermes-core <a href={`${base}/cookbook/`}>Cookbook</a> — eight worked recipes, mostly L1-L2; the curator and multi-agent recipes brush against L3 patterns.</li>
+          <li>Hermes-core <a href={`${base}/how-to/`}>How-To</a> — VPS deployment + hardening for when you're crossing L3 into L4.</li>
+        </ul>
+      </section>
+
+      <footer class="hc-foot">
+        <p class="hc-foot-meta">
+          Built against Hermes Agent <code>v{HERMES_VERSION}</code> ({HERMES_TAG}). The four-level framing is grounded in a community thread by Shann³ on X (May 2026); the gates, failure modes, and cross-cutting grid are an editorial expansion for this page. <b>Mediocrity scales faster than excellence — pass the gate before you promote.</b>
+        </p>
+      </footer>
+    </main>
+
+    <script>
+      const printBtn = document.getElementById("hc-pdf");
+      if (printBtn) printBtn.addEventListener("click", () => window.print());
+    </script>
+
+    <style is:global>
+      .sc-page { color: var(--color-fg); }
+
+      .sc-accent { color: var(--color-warn) !important; }
+
+      .sc-mod { border-left: 3px solid var(--sc-c, var(--color-bronze)); padding-left: 14px; }
+      .sc-fl-a { --sc-c: var(--color-gold); }
+      .sc-fl-b { --sc-c: var(--color-amber); }
+      .sc-fl-c { --sc-c: var(--color-warn); }
+      .sc-fl-d { --sc-c: var(--color-error); }
+
+      .sc-grid-wrap {
+        overflow-x: auto;
+        margin: 0.75rem 0 0.5rem;
+        border: 1px solid var(--color-surface-mid);
+        border-radius: 3px;
+      }
+      .sc-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      .sc-grid th, .sc-grid td {
+        text-align: left;
+        padding: 7px 11px;
+        border-bottom: 1px solid var(--color-surface-mid);
+        vertical-align: top;
+        font-family: var(--font-mono, ui-monospace, monospace);
+      }
+      .sc-grid thead th {
+        font-family: var(--font-mono, ui-monospace, monospace);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--color-amber);
+        background: var(--color-surface);
+        font-weight: 700;
+      }
+      .sc-grid tbody td:first-child {
+        color: var(--color-fg);
+        font-weight: 400;
+        background: var(--color-surface);
+      }
+      .sc-grid tbody td b {
+        color: var(--color-gold);
+        font-weight: 700;
+      }
+      .sc-grid .sc-cell-warn { color: var(--color-warn); }
+      .sc-grid .sc-cell-crit { color: var(--color-error); }
+      .sc-grid code {
+        font-family: var(--font-mono, ui-monospace, monospace);
+        color: var(--color-amber);
+        font-size: 0.85em;
+      }
+
+      .sc-anti {
+        margin: 1rem 0;
+        padding: 0.5rem 0 0.5rem 14px;
+        border-left: 2px solid var(--color-warn);
+      }
+      .sc-anti h3 {
+        color: var(--color-warn);
+        font-family: var(--font-mono, ui-monospace, monospace);
+        font-size: 0.95rem;
+        margin: 0 0 0.5rem;
+      }
+      .sc-anti p { margin: 0; font-size: 0.92rem; line-height: 1.55; }
+      .sc-anti p i { color: var(--color-gold); font-style: italic; }
+    </style>
+  </body>
+</html>

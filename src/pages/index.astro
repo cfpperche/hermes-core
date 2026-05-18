@@ -51,12 +51,12 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           A reference companion for <a href="https://github.com/NousResearch/hermes-agent" class="ix-inline-link">Hermes Agent</a> by NousResearch.
         </p>
         <p class="ix-subtag">
-          Eight free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
+          Nine free surfaces. Built against <code>hermes-agent@{HERMES_VERSION}</code>. MIT.
         </p>
       </section>
 
       <section class="ix-strip-banner">
-        <span>▮ EIGHT FREE SURFACES — CHEATSHEET · MASTERCLASS · FOUNDATION · INTERNALS · HOW-TO · ROUTING · SKILLS · COOKBOOK ▮</span>
+        <span>▮ NINE FREE SURFACES — CHEATSHEET · MASTERCLASS · FOUNDATION · INTERNALS · HOW-TO · ROUTING · SKILLS · COOKBOOK · SCALE ▮</span>
       </section>
 
       <section class="ix-grid" aria-label="Learning surfaces">
@@ -169,6 +169,20 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
           </p>
           <div class="ix-card-meta">
             <span>8 recipes</span><span>·</span><span>setup + run + observed</span><span>·</span><span>variations</span>
+          </div>
+        </a>
+
+        <a href={`${base}/scale/`} class="ix-card ix-card-flame">
+          <div class="ix-card-h">
+            <span class="ix-card-n">09</span>
+            <span class="ix-card-title">Scale</span>
+            <span class="ix-card-arr" aria-hidden="true">↗</span>
+          </div>
+          <p class="ix-card-desc">
+            From one agent to a team. Four levels (main → specialist → orchestrated → automated), three gates between them, four anti-patterns to avoid, and a cross-cutting capability grid that explains <b>which discipline you can skip at L1 and which becomes load-bearing at L3-L4.</b>
+          </p>
+          <div class="ix-card-meta">
+            <span>4 levels · 3 gates</span><span>·</span><span>4 anti-patterns</span><span>·</span><span>capability grid</span>
           </div>
         </a>
       </section>
@@ -354,6 +368,7 @@ const pageDesc = `Community-built learning surface for Hermes Agent ${HERMES_VER
       .ix-card-gold-bright { --ix-c: var(--color-gold); border-left-color: var(--color-amber); }
       .ix-card-amber-deep  { --ix-c: var(--color-amber); border-left-color: var(--color-teal); }
       .ix-card-teal-bright { --ix-c: var(--color-teal); border-left-color: var(--color-gold); }
+      .ix-card-flame       { --ix-c: var(--color-warn); border-left-color: var(--color-error); }
 
       .ix-card-h {
         display: flex;

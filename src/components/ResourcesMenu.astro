@@ -5,7 +5,7 @@
 // Add a new surface? Add a row to RESOURCES below and a slug to CurrentPage.
 // Every page that imports this component picks it up automatically.
 
-export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to" | "routing" | "skills" | "cookbook";
+export type CurrentPage = "cheatsheet" | "masterclass" | "foundation" | "internals" | "how-to" | "routing" | "skills" | "cookbook" | "scale";
 
 interface Props {
   current: CurrentPage;
@@ -76,6 +76,13 @@ const RESOURCES: {
     title: "Cookbook",
     desc: "8 worked recipes — code review, research, curator, triage, proxy, MCP, spec, memory",
     href: `${base}/cookbook/`,
+  },
+  {
+    slug: "scale",
+    num: "09",
+    title: "Scale",
+    desc: "From one agent to a team — 4 levels, 3 gates, anti-patterns, cross-cutting requirements",
+    href: `${base}/scale/`,
   },
 ];
 ---
